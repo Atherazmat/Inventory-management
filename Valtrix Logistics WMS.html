@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Valtrix Logistics — Warehouse Management System</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg-grad: linear-gradient(160deg,#eef2f7 0%,#f6f8fb 45%,#eef1f6 100%);
+  --surface: rgba(255,255,255,0.78);
+  --surface-solid:#ffffff;
+  --border: rgba(20,30,45,0.10);
+  --text-primary:#152238;
+  --text-secondary:#5b677c;
+  --accent:#1d4e89;
+  --accent-2:#f5a623;
+  --shadow:0 10px 30px rgba(21,34,56,0.10);
+  --shadow-sm:0 4px 14px rgba(21,34,56,0.08);
+  --radius-lg:18px; --radius-md:13px; --radius-sm:9px;
+  --success:#1a7f4e; --success-bg:rgba(26,127,78,.13);
+  --warning:#b7791f; --warning-bg:rgba(183,121,31,.15);
+  --danger:#c0392b; --danger-bg:rgba(192,57,43,.13);
+  --info:#2563eb; --info-bg:rgba(37,99,235,.13);
+  --purple:#7c3aed; --purple-bg:rgba(124,58,237,.13);
+  --muted:#5b677c; --muted-bg:rgba(91,103,124,.13);
+  --sidebar-w:236px;
+}
+html.dark{
+  --bg-grad: linear-gradient(160deg,#0b1220 0%,#0f1a2c 50%,#0b1220 100%);
+  --surface: rgba(22,32,50,0.68);
+  --surface-solid:#141e30;
+  --border: rgba(210,222,240,0.10);
+  --text-primary:#e9eefb;
+  --text-secondary:#9fb0cc;
+  --shadow:0 10px 30px rgba(0,0,0,.45);
+  --shadow-sm:0 4px 14px rgba(0,0,0,.35);
+}
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg-grad); color:var(--text-primary); min-height:100vh; transition:background .4s ease,color .3s ease; }
+h1,h2,h3,p{ margin:0; }
+button{ font-family:inherit; cursor:pointer; }
+input,select,button,textarea{ font-size:.92rem; font-family:inherit; }
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-thumb{ background:rgba(100,116,139,.35); border-radius:10px; }
+
+#loadingOverlay{ position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:var(--bg-grad); transition:opacity .4s ease,visibility .4s ease; }
+#loadingOverlay.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+.spinner{ position:relative; width:48px; height:48px; }
+.spinner::before,.spinner::after{ content:""; position:absolute; inset:0; border-radius:50%; border:4px solid transparent; }
+.spinner::before{ border-top-color:var(--accent); border-right-color:var(--accent); animation:spin .9s cubic-bezier(.6,.1,.4,.9) infinite; }
+.spinner::after{ inset:8px; border-bottom-color:var(--accent-2); border-left-color:var(--accent-2); opacity:.75; animation:spin 1.2s linear infinite reverse; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.loading-text{ font-weight:600; color:var(--text-secondary); }
+
+.app-layout{ display:flex; min-height:100vh; }
+.sidebar{ width:var(--sidebar-w); flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); backdrop-filter:blur(16px); display:flex; flex-direction:column; padding:18px 14px; position:sticky; top:0; height:100vh; overflow-y:auto; }
+.brand{ display:flex; align-items:center; gap:10px; padding:6px 8px 18px; }
+.brand-logo{ width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; font-size:1.2rem; box-shadow:var(--shadow-sm); flex-shrink:0; }
+.brand h1{ font-size:1.02rem; font-weight:800; color:var(--text-primary); line-height:1.15; }
+.brand p{ font-size:.7rem; color:var(--text-secondary); margin-top:2px; letter-spacing:.03em; text-transform:uppercase; }
+.side-nav{ display:flex; flex-direction:column; gap:3px; flex:1; }
+.nav-item{ display:flex; align-items:center; gap:10px; text-align:left; border:none; background:transparent; color:var(--text-secondary); padding:10px 12px; border-radius:var(--radius-sm); font-weight:600; font-size:.86rem; transition:background .18s ease,color .18s ease,transform .15s ease; }
+.nav-item:hover{ background:rgba(29,78,137,.08); color:var(--text-primary); }
+.nav-item.active{ background:linear-gradient(120deg,var(--accent),#2b6cb0); color:#fff; box-shadow:0 6px 16px rgba(29,78,137,.35); }
+.nav-icon{ font-size:1.05rem; width:20px; text-align:center; }
+.sidebar-footer{ display:flex; flex-direction:column; gap:10px; padding-top:14px; border-top:1px solid var(--border); margin-top:10px; }
+.sync-status{ font-size:.72rem; color:var(--text-secondary); display:flex; align-items:center; gap:6px; padding:4px 6px; }
+.sync-dot{ width:7px; height:7px; border-radius:50%; background:var(--success); flex-shrink:0; }
+.sync-dot.syncing{ background:var(--warning); animation:pulseDot 1s ease-in-out infinite; }
+.sync-dot.offline{ background:var(--danger); }
+@keyframes pulseDot{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+#darkModeToggle{ width:100%; padding:9px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-solid); color:var(--text-primary); font-weight:600; font-size:.82rem; }
+
+.main-wrap{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 26px; background:var(--surface); border-bottom:1px solid var(--border); backdrop-filter:blur(14px); position:sticky; top:0; z-index:50; flex-wrap:wrap; }
+#mobileNavToggle{ display:none; }
+#pageTitle{ font-size:1.18rem; font-weight:800; }
+#pageSubtitle{ font-size:.78rem; color:var(--text-secondary); margin-top:2px; }
+#headerClock{ font-size:.85rem; font-weight:700; color:var(--text-primary); background:rgba(29,78,137,.08); padding:6px 12px; border-radius:999px; font-variant-numeric:tabular-nums; }
+.content{ padding:22px 26px 60px; max-width:1360px; width:100%; margin:0 auto; }
+.page{ display:none; animation:fadeIn .35s ease; }
+.page.active{ display:block; }
+@keyframes fadeIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+
+.glass-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); backdrop-filter:blur(14px); padding:20px; margin-bottom:18px; }
+.page-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.filters-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.filters-row input,.filters-row select{ min-width:150px; }
+.filters-row input[type="date"]{ min-width:130px; }
+
+.btn{ border:none; border-radius:var(--radius-sm); padding:10px 16px; font-weight:700; font-size:.84rem; transition:transform .16s ease,box-shadow .16s ease,opacity .16s ease; }
+.btn:active{ transform:scale(.96); }
+.btn-primary{ background:linear-gradient(120deg,var(--accent),#2b6cb0); color:#fff; box-shadow:0 6px 16px rgba(29,78,137,.32); }
+.btn-primary:hover{ box-shadow:0 8px 22px rgba(29,78,137,.42); transform:translateY(-1px); }
+.btn-secondary{ background:var(--accent-2); color:#1a1a1a; }
+.btn-secondary:hover{ transform:translateY(-1px); }
+.btn-outline{ background:transparent; border:1px solid var(--border); color:var(--text-primary); }
+.btn-outline:hover{ background:rgba(29,78,137,.08); }
+.btn-outline-danger{ background:transparent; border:1px solid rgba(192,57,43,.4); color:var(--danger); }
+.btn-outline-danger:hover{ background:var(--danger-bg); }
+.btn-sm{ padding:6px 11px; font-size:.75rem; }
+.icon-btn{ background:transparent; border:none; font-size:.98rem; padding:6px 8px; border-radius:8px; color:var(--text-secondary); }
+.icon-btn:hover{ background:rgba(29,78,137,.1); color:var(--text-primary); }
+.icon-btn.danger:hover{ background:var(--danger-bg); color:var(--danger); }
+
+input[type="text"],input[type="number"],input[type="date"],input[type="month"],select,textarea{
+  background:var(--surface-solid); border:1px solid var(--border); color:var(--text-primary); padding:9px 12px; border-radius:var(--radius-sm); outline:none; width:100%; transition:border-color .2s ease,box-shadow .2s ease;
+}
+textarea{ resize:vertical; font-family:inherit; }
+input:focus,select:focus,textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(29,78,137,.16); }
+.field-group{ display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+.field-group label{ font-size:.76rem; font-weight:700; color:var(--text-secondary); }
+.field-checkbox label{ display:flex; align-items:center; gap:8px; font-size:.84rem; font-weight:600; color:var(--text-primary); }
+.field-checkbox input{ width:auto; }
+.form-grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:560px){ .form-grid-2{ grid-template-columns:1fr; } }
+
+/* stat cards */
+.stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:20px; }
+.stat-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); padding:16px 18px; display:flex; align-items:center; gap:12px; }
+.stat-icon{ width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0; }
+.stat-card-value{ font-size:1.3rem; font-weight:800; line-height:1.1; }
+.stat-card-label{ font-size:.72rem; color:var(--text-secondary); font-weight:600; margin-top:2px; }
+.chart-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px; }
+@media (max-width:860px){ .chart-grid{ grid-template-columns:1fr; } }
+.chart-card-header h3{ font-size:.92rem; font-weight:800; margin-bottom:10px; }
+.chart-wrap{ height:230px; position:relative; }
+.dash-lists{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
+@media (max-width:920px){ .dash-lists{ grid-template-columns:1fr; } }
+
+/* table */
+.table-wrap{ overflow-x:auto; }
+table{ width:100%; border-collapse:collapse; min-width:560px; }
+thead th{ text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-secondary); padding:11px 14px; border-bottom:1px solid var(--border); white-space:nowrap; }
+tbody td{ padding:10px 14px; border-bottom:1px solid var(--border); font-size:.84rem; vertical-align:middle; }
+tbody tr:last-child td{ border-bottom:none; }
+tbody tr:hover{ background:rgba(29,78,137,.05); }
+.cell-actions{ display:flex; gap:2px; white-space:nowrap; }
+.empty-state{ text-align:center; padding:34px 12px; color:var(--text-secondary); font-size:.85rem; }
+.empty-state-icon{ font-size:2rem; margin-bottom:8px; opacity:.6; }
+
+/* badges */
+.badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:.7rem; font-weight:700; white-space:nowrap; }
+.badge-success{ background:var(--success-bg); color:var(--success); }
+.badge-warning{ background:var(--warning-bg); color:var(--warning); }
+.badge-danger{ background:var(--danger-bg); color:var(--danger); }
+.badge-info{ background:var(--info-bg); color:var(--info); }
+.badge-purple{ background:var(--purple-bg); color:var(--purple); }
+.badge-muted{ background:var(--muted-bg); color:var(--muted); }
+select.status-select{ padding:5px 8px; font-size:.75rem; border-radius:999px; font-weight:700; }
+
+/* modal */
+.modal-overlay{ position:fixed; inset:0; background:rgba(10,15,25,.5); display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px; z-index:2000; opacity:0; visibility:hidden; transition:opacity .2s ease,visibility .2s ease; overflow-y:auto; }
+.modal-overlay.show{ opacity:1; visibility:visible; }
+.modal-box{ background:var(--surface-solid); border-radius:var(--radius-lg); box-shadow:var(--shadow); width:100%; max-width:560px; padding:22px; margin-bottom:5vh; }
+.modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.modal-head h3{ font-size:1.02rem; font-weight:800; }
+.modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+#confirmModal{ position:fixed; inset:0; background:rgba(10,15,25,.5); display:flex; align-items:center; justify-content:center; padding:16px; z-index:2100; opacity:0; visibility:hidden; transition:opacity .2s ease,visibility .2s ease; }
+#confirmModal.show{ opacity:1; visibility:visible; }
+#confirmModal .modal-box{ max-width:400px; }
+#confirmModal h3{ font-size:1rem; font-weight:800; margin-bottom:8px; }
+#confirmModal p{ font-size:.85rem; color:var(--text-secondary); }
+
+/* order items editor */
+.order-items-editor{ border:1px dashed var(--border); border-radius:var(--radius-md); padding:12px; margin-bottom:12px; }
+.order-items-editor > label{ font-size:.76rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:8px; }
+.item-row{ display:grid; grid-template-columns:1fr 70px 90px 30px; gap:8px; margin-bottom:8px; align-items:center; }
+@media (max-width:480px){ .item-row{ grid-template-columns:1fr 60px 30px; } .item-row .item-price{ display:none; } }
+.item-price{ font-size:.78rem; color:var(--text-secondary); text-align:right; }
+.item-row button{ background:var(--danger-bg); color:var(--danger); border:none; border-radius:7px; width:28px; height:28px; }
+
+/* toasts */
+#toastContainer{ position:fixed; bottom:20px; right:20px; z-index:3000; display:flex; flex-direction:column; gap:10px; max-width:320px; }
+.toast{ padding:12px 16px; border-radius:var(--radius-sm); box-shadow:var(--shadow); font-size:.85rem; font-weight:600; color:#fff; animation:toastIn .3s ease; }
+@keyframes toastIn{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+.toast.success{ background:var(--success); }
+.toast.error{ background:var(--danger); }
+.toast.info{ background:var(--accent); }
+
+.summary-strip{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.summary-pill{ padding:6px 13px; border-radius:999px; font-size:.76rem; font-weight:700; }
+.low-stock-row{ display:flex; align-items:center; justify-content:space-between; padding:9px 4px; border-bottom:1px solid var(--border); font-size:.82rem; }
+.low-stock-row:last-child{ border-bottom:none; }
+.recent-order-row{ display:flex; align-items:center; justify-content:space-between; padding:9px 4px; border-bottom:1px solid var(--border); font-size:.82rem; gap:8px; }
+.recent-order-row:last-child{ border-bottom:none; }
+
+@media (max-width:860px){
+  .sidebar{ position:fixed; left:0; top:0; height:100vh; z-index:1000; transform:translateX(-100%); transition:transform .25s ease; }
+  .sidebar.open{ transform:translateX(0); }
+  #mobileNavToggle{ display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; border:1px solid var(--border); background:var(--surface-solid); font-size:1.1rem; }
+  .content{ padding:16px 14px 50px; }
+  .topbar{ padding:12px 14px; }
+  .stat-grid{ grid-template-columns:repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay"><div class="spinner"></div><div class="loading-text">Loading Valtrix WMS…</div></div>
+
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-logo">📦</div><div><h1>Valtrix Logistics</h1><p>Warehouse Mgmt</p></div></div>
+    <nav class="side-nav" id="sideNav">
+      <button class="nav-item active" data-action="nav" data-page="dashboard"><span class="nav-icon">📊</span>Dashboard</button>
+      <button class="nav-item" data-action="nav" data-page="sellers"><span class="nav-icon">🤝</span>Sellers / Clients</button>
+      <button class="nav-item" data-action="nav" data-page="products"><span class="nav-icon">🏷️</span>Products</button>
+      <button class="nav-item" data-action="nav" data-page="inventory"><span class="nav-icon">📥</span>Inventory</button>
+      <button class="nav-item" data-action="nav" data-page="orders"><span class="nav-icon">🧾</span>Orders</button>
+      <button class="nav-item" data-action="nav" data-page="shipments"><span class="nav-icon">🚚</span>Shipments</button>
+      <button class="nav-item" data-action="nav" data-page="returns"><span class="nav-icon">↩️</span>Returns</button>
+      <button class="nav-item" data-action="nav" data-page="settlements"><span class="nav-icon">💰</span>COD / Settlements</button>
+      <button class="nav-item" data-action="nav" data-page="expenses"><span class="nav-icon">💳</span>Expenses</button>
+      <button class="nav-item" data-action="nav" data-page="reports"><span class="nav-icon">📈</span>Reports</button>
+      <button class="nav-item" data-action="nav" data-page="settings"><span class="nav-icon">⚙️</span>Settings</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sync-status" id="syncStatus"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></div>
+      <button id="darkModeToggle" type="button">🌙 Dark Mode</button>
+    </div>
+  </aside>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button id="mobileNavToggle" type="button">☰</button>
+        <div><div id="pageTitle">Dashboard</div><div id="pageSubtitle">Overview of your warehouse operations</div></div>
+      </div>
+      <div id="headerClock">--:--:--</div>
+    </header>
+
+    <main class="content">
+
+      <!-- DASHBOARD -->
+      <section class="page active" id="page-dashboard">
+        <div class="stat-grid" id="dashStatGrid"></div>
+        <div class="chart-grid">
+          <div class="glass-card"><div class="chart-card-header"><h3>📦 Orders by Status</h3></div><div class="chart-wrap"><canvas id="ordersStatusChart"></canvas></div></div>
+          <div class="glass-card"><div class="chart-card-header"><h3>💵 Revenue — Last 7 Days</h3></div><div class="chart-wrap"><canvas id="revenueTrendChart"></canvas></div></div>
+        </div>
+        <div class="dash-lists">
+          <div class="glass-card"><h3 style="font-size:.92rem;font-weight:800;margin-bottom:10px;">🧾 Recent Orders</h3><div id="dashRecentOrders"></div></div>
+          <div class="glass-card"><h3 style="font-size:.92rem;font-weight:800;margin-bottom:10px;">⚠️ Low Stock Alerts</h3><div id="dashLowStock"></div></div>
+        </div>
+      </section>
+
+      <!-- SELLERS -->
+      <section class="page" id="page-sellers">
+        <div class="page-toolbar"><div class="filters-row"><input type="text" id="sellerSearch" placeholder="Search sellers…" /></div><button class="btn btn-primary" data-action="add-seller">+ Add Seller</button></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>Business</th><th>Owner</th><th>Phone</th><th>WhatsApp</th><th>Status</th><th></th></tr></thead><tbody id="sellersTbody"></tbody></table></div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section class="page" id="page-products">
+        <div class="page-toolbar"><div class="filters-row"><input type="text" id="productSearch" placeholder="Search products / SKU…" /><select id="productSellerFilter"><option value="">All Sellers</option></select></div><button class="btn btn-primary" data-action="add-product">+ Add Product</button></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>SKU</th><th>Name</th><th>Seller</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Location</th><th></th></tr></thead><tbody id="productsTbody"></tbody></table></div>
+      </section>
+
+      <!-- INVENTORY -->
+      <section class="page" id="page-inventory">
+        <div class="page-toolbar"><div class="filters-row"><input type="text" id="inventorySearch" placeholder="Search products…" /><label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;color:var(--text-secondary);"><input type="checkbox" id="lowStockOnlyToggle" style="width:auto;"/> Low stock only</label></div></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>SKU</th><th>Name</th><th>Seller</th><th>Location</th><th>Stock</th><th>Threshold</th><th>Status</th><th></th></tr></thead><tbody id="inventoryTbody"></tbody></table></div>
+        <div class="glass-card"><h3 style="font-size:.92rem;font-weight:800;margin-bottom:10px;">📜 Recent Stock Movements</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Product</th><th>Type</th><th>Qty</th><th>Reason</th></tr></thead><tbody id="inventoryLogTbody"></tbody></table></div></div>
+      </section>
+
+      <!-- ORDERS -->
+      <section class="page" id="page-orders">
+        <div class="page-toolbar"><div class="filters-row"><input type="text" id="orderSearch" placeholder="Search order, customer…" /><select id="orderStatusFilter"><option value="">All Statuses</option></select><select id="orderSellerFilter"><option value="">All Sellers</option></select></div><button class="btn btn-primary" data-action="add-order">+ Add Order</button></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>Order</th><th>Seller</th><th>Customer</th><th>Amount</th><th>COD</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody id="ordersTbody"></tbody></table></div>
+      </section>
+
+      <!-- SHIPMENTS -->
+      <section class="page" id="page-shipments">
+        <div class="page-toolbar"><div class="filters-row"><input type="text" id="shipmentSearch" placeholder="Search tracking, order…" /><select id="shipmentCourierFilter"><option value="">All Couriers</option></select></div><button class="btn btn-primary" data-action="add-shipment">+ Add Shipment</button></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>Order</th><th>Courier</th><th>Tracking #</th><th>Ship Date</th><th>COD</th><th>Charges</th><th>Status</th><th></th></tr></thead><tbody id="shipmentsTbody"></tbody></table></div>
+      </section>
+
+      <!-- RETURNS -->
+      <section class="page" id="page-returns">
+        <div class="page-toolbar"><div class="filters-row"><input type="text" id="returnSearch" placeholder="Search returns…" /></div><button class="btn btn-primary" data-action="add-return">+ Add Return</button></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>Return</th><th>Order</th><th>Seller</th><th>Product</th><th>Qty</th><th>Reason</th><th>Condition</th><th>Restocked</th><th></th></tr></thead><tbody id="returnsTbody"></tbody></table></div>
+      </section>
+
+      <!-- SETTLEMENTS -->
+      <section class="page" id="page-settlements">
+        <div class="glass-card"><h3 style="font-size:.92rem;font-weight:800;margin-bottom:10px;">📋 Outstanding COD by Seller</h3><div class="table-wrap"><table><thead><tr><th>Seller</th><th>Delivered COD</th><th>Already Settled</th><th>Outstanding</th><th></th></tr></thead><tbody id="outstandingTbody"></tbody></table></div></div>
+        <div class="page-toolbar"><div class="filters-row"><select id="settlementSellerFilter"><option value="">All Sellers</option></select><select id="settlementPaidFilter"><option value="">All</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></div><button class="btn btn-primary" data-action="add-settlement">+ Add Settlement</button></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>Settlement</th><th>Seller</th><th>Period</th><th>COD Collected</th><th>Courier Chg</th><th>Service Chg</th><th>Payable</th><th>Status</th><th></th></tr></thead><tbody id="settlementsTbody"></tbody></table></div>
+      </section>
+
+      <!-- EXPENSES -->
+      <section class="page" id="page-expenses">
+        <div class="page-toolbar"><div class="filters-row"><input type="text" id="expenseSearch" placeholder="Search expenses…" /><select id="expenseCategoryFilter"><option value="">All Categories</option></select></div><button class="btn btn-primary" data-action="add-expense">+ Add Expense</button></div>
+        <div class="glass-card table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr></thead><tbody id="expensesTbody"></tbody></table></div>
+      </section>
+
+      <!-- REPORTS -->
+      <section class="page" id="page-reports">
+        <div class="glass-card">
+          <div class="filters-row" style="margin-bottom:6px;">
+            <div class="field-group" style="margin-bottom:0;"><label>From</label><input type="date" id="reportFrom" /></div>
+            <div class="field-group" style="margin-bottom:0;"><label>To</label><input type="date" id="reportTo" /></div>
+            <button class="btn btn-outline" id="reportRunBtn" type="button" style="margin-top:18px;">Generate</button>
+            <button class="btn btn-outline" id="reportThisMonthBtn" type="button" style="margin-top:18px;">This Month</button>
+          </div>
+        </div>
+        <div class="stat-grid" id="reportStatGrid"></div>
+        <div class="glass-card"><h3 style="font-size:.92rem;font-weight:800;margin-bottom:10px;">Per-Seller Breakdown</h3><div class="table-wrap"><table><thead><tr><th>Seller</th><th>Orders</th><th>Revenue</th><th>COD Collected</th><th>Payable Outstanding</th></tr></thead><tbody id="reportSellerTbody"></tbody></table></div></div>
+        <div class="glass-card">
+          <h3 style="font-size:.92rem;font-weight:800;margin-bottom:10px;">Export Data (CSV)</h3>
+          <div class="filters-row">
+            <button class="btn btn-outline btn-sm" data-action="export-csv" data-collection="sellers">Sellers</button>
+            <button class="btn btn-outline btn-sm" data-action="export-csv" data-collection="products">Products</button>
+            <button class="btn btn-outline btn-sm" data-action="export-csv" data-collection="orders">Orders</button>
+            <button class="btn btn-outline btn-sm" data-action="export-csv" data-collection="shipments">Shipments</button>
+            <button class="btn btn-outline btn-sm" data-action="export-csv" data-collection="returns">Returns</button>
+            <button class="btn btn-outline btn-sm" data-action="export-csv" data-collection="settlements">Settlements</button>
+            <button class="btn btn-outline btn-sm" data-action="export-csv" data-collection="expenses">Expenses</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="page" id="page-settings">
+        <div class="glass-card">
+          <h3 style="font-size:.92rem;font-weight:800;margin-bottom:14px;">🏢 Company Info</h3>
+          <form id="settingsForm">
+            <div class="form-grid-2">
+              <div class="field-group"><label>Company Name</label><input type="text" id="setCompanyName" /></div>
+              <div class="field-group"><label>Phone</label><input type="text" id="setCompanyPhone" /></div>
+            </div>
+            <div class="field-group"><label>Address</label><textarea id="setCompanyAddress" rows="2"></textarea></div>
+            <div class="form-grid-2">
+              <div class="field-group"><label>Default Fulfillment Service Charge (PKR, flat, used to pre-fill new settlements)</label><input type="number" step="0.01" id="setDefaultServiceCharge" /></div>
+              <div class="field-group"><label>Default Low-Stock Threshold (for new products)</label><input type="number" step="1" id="setDefaultLowStock" /></div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+          </form>
+        </div>
+        <div class="glass-card" style="border:1px dashed rgba(192,57,43,.4);">
+          <h3 style="font-size:.92rem;font-weight:800;margin-bottom:8px;color:var(--danger);">⚠️ Danger Zone</h3>
+          <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:12px;">Permanently delete all sellers, products, orders, shipments, returns, settlements and expenses on this shared account. This cannot be undone.</p>
+          <button class="btn btn-outline-danger" id="resetAllBtn" type="button">Reset All Data</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="modalTitle">Add</h3><button class="icon-btn" id="modalCloseBtn" type="button">✕</button></div>
+    <form id="modalForm">
+      <div id="modalFieldsContainer"></div>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" id="modalCancelBtn">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirmModal">
+  <div class="modal-box">
+    <h3>Are you sure?</h3>
+    <p id="confirmMessage">This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button id="confirmCancelBtn" type="button" class="btn btn-outline">Cancel</button>
+      <button id="confirmOkBtn" type="button" class="btn btn-outline-danger">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   SECTION 1: CONSTANTS
+============================================================ */
+const STORAGE_KEY = "valtrix_wms_state_v1";
+const SUPABASE_URL = "https://vpujtqytmcfczykiyjga.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdWp0cXl0bWNmY3p5a2l5amdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MDk2MjEsImV4cCI6MjEwMjE4NTYyMX0.k34ESvgPOEqBdFGRhx4wVajqSkHFwfjZ-wAEVVC9_GE";
+const CLOUD_ROW_ID = "school_portal_main";
+let cloud = null;
+try{
+  if(window.supabase && typeof window.supabase.createClient === "function"){
+    cloud = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }else{ console.warn("Valtrix WMS: Supabase library did not load — running in local-only mode."); }
+}catch(err){ console.warn("Valtrix WMS: could not initialize cloud client — running in local-only mode.", err); }
+
+let cloudSaveTimer = null;
+const pendingEchoTimestamps = new Set();
+let pushChain = Promise.resolve();
+let lastPushFailed = false;
+let lastKnownRemoteUpdatedAt = null;
+let pollTimer = null;
+let pollInFlight = false;
+let isCloudSaving = false;
+const POLL_INTERVAL_MS = 5000;
+let pollBackoffMs = POLL_INTERVAL_MS;
+const POLL_BACKOFF_MAX_MS = 60000;
+
+const COLLECTIONS = ["sellers","products","inventoryLogs","orders","shipments","returns","settlements","expenses"];
+const ORDER_STATUSES = ["Pending","Packed","Ready to Ship","Shipped","Delivered","Cancelled","Returned"];
+const COURIERS = ["Leopards","M&P","TCS","PostEx","Other"];
+const DELIVERY_STATUSES = ["Pending Pickup","In Transit","Delivered","Returned","Failed"];
+const RETURN_CONDITIONS = ["Good","Damaged","Used","Missing Parts"];
+const EXPENSE_CATEGORIES = ["Rent","Utilities","Salaries","Packaging","Courier","Marketing","Maintenance","Other"];
+
+const STATUS_BADGE = {
+  "Pending":"muted","Packed":"warning","Ready to Ship":"info","Shipped":"info","Delivered":"success","Cancelled":"danger","Returned":"purple",
+  "Pending Pickup":"muted","In Transit":"info","Failed":"danger",
+  "Good":"success","Damaged":"danger","Used":"warning","Missing Parts":"danger"
+};
+
+let state = null;
+let els = {};
+let charts = {};
+const ui = { activePage:"dashboard" };
+
+/* ============================================================
+   SECTION 2: STATE / PERSISTENCE / MERGE
+============================================================ */
+function defaultTombstones(){ const t={}; COLLECTIONS.forEach(c=>t[c]={}); return t; }
+function normalizeTombstones(parsed){
+  const t = (parsed && typeof parsed==="object") ? parsed : {};
+  const out = {};
+  COLLECTIONS.forEach(c=>{ out[c] = (t[c] && typeof t[c]==="object") ? t[c] : {}; });
+  return out;
+}
+function defaultState(){
+  const s = { settings:{}, tombstones: defaultTombstones() };
+  COLLECTIONS.forEach(c=>{ s[c] = []; });
+  return s;
+}
+function normalizeState(parsed){
+  if(!parsed || typeof parsed !== "object") return defaultState();
+  const out = {
+    settings: (parsed.settings && typeof parsed.settings==="object") ? parsed.settings : {},
+    tombstones: normalizeTombstones(parsed.tombstones)
+  };
+  COLLECTIONS.forEach(c=>{ out[c] = Array.isArray(parsed[c]) ? parsed[c] : []; });
+  return out;
+}
+function mergeArraysById(remoteArr, localArr, mergeItem){
+  remoteArr = Array.isArray(remoteArr) ? remoteArr : [];
+  localArr = Array.isArray(localArr) ? localArr : [];
+  const map = new Map();
+  remoteArr.forEach(item=>{ if(item && item.id != null) map.set(item.id, item); });
+  localArr.forEach(item=>{
+    if(!item || item.id == null) return;
+    const existing = map.get(item.id);
+    map.set(item.id, existing ? (mergeItem ? mergeItem(existing, item) : item) : item);
+  });
+  return Array.from(map.values());
+}
+function mergeTombstoneMap(remoteMap, localMap){
+  remoteMap = (remoteMap && typeof remoteMap==="object") ? remoteMap : {};
+  localMap = (localMap && typeof localMap==="object") ? localMap : {};
+  const out = { ...remoteMap };
+  Object.keys(localMap).forEach(k=>{ out[k] = Math.max(Number(remoteMap[k])||0, Number(localMap[k])||0); });
+  return out;
+}
+function mergeTombstones(remoteT, localT){
+  remoteT = normalizeTombstones(remoteT); localT = normalizeTombstones(localT);
+  const out = {};
+  COLLECTIONS.forEach(c=>{ out[c] = mergeTombstoneMap(remoteT[c], localT[c]); });
+  return out;
+}
+function pruneTombstonedById(arr, tombMap){
+  if(!Array.isArray(arr)) return [];
+  tombMap = tombMap || {};
+  return arr.filter(item=> !(item && item.id != null && tombMap[item.id] != null));
+}
+function mergeStates(remote, local){
+  remote = normalizeState(remote); local = normalizeState(local);
+  const tombstones = mergeTombstones(remote.tombstones, local.tombstones);
+  const out = { settings: { ...remote.settings, ...local.settings }, tombstones };
+  COLLECTIONS.forEach(c=>{ out[c] = pruneTombstonedById(mergeArraysById(remote[c], local[c]), tombstones[c]); });
+  return out;
+}
+function buildFullWipeTombstones(prevState, ts){
+  ts = ts || Date.now();
+  const t = defaultTombstones();
+  COLLECTIONS.forEach(c=>{ (prevState[c]||[]).forEach(item=>{ if(item && item.id!=null) t[c][item.id]=ts; }); });
+  return t;
+}
+function loadLocalCache(){
+  try{ const raw = localStorage.getItem(STORAGE_KEY); return raw ? normalizeState(JSON.parse(raw)) : defaultState(); }
+  catch(err){ return defaultState(); }
+}
+async function loadState(){
+  if(!cloud) return loadLocalCache();
+  try{
+    const { data, error } = await cloud.from("app_state").select("data").eq("id", CLOUD_ROW_ID).maybeSingle();
+    if(error) throw error;
+    if(!data){
+      const seed = loadLocalCache();
+      await cloud.from("app_state").upsert({ id: CLOUD_ROW_ID, data: seed, updated_at: new Date().toISOString() });
+      return seed;
+    }
+    const fresh = normalizeState(data.data);
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)); }catch(e){}
+    return fresh;
+  }catch(err){
+    console.warn("Valtrix WMS: could not reach cloud storage, using local cache.", err);
+    showToast("Offline — showing last saved data on this device.", "error");
+    return loadLocalCache();
+  }
+}
+function sanitizeState(){
+  state.sellers.forEach(s=>{ if(s.active==null) s.active=true; });
+  state.products.forEach(p=>{
+    p.stock = Number(p.stock)||0; p.costPrice = Number(p.costPrice)||0; p.sellingPrice = Number(p.sellingPrice)||0;
+    p.lowStockThreshold = Number(p.lowStockThreshold)||0;
+  });
+  state.orders.forEach(o=>{
+    if(!Array.isArray(o.items)) o.items=[];
+    o.amount = Number(o.amount)||0; o.codAmount = Number(o.codAmount)||0;
+    if(!o.status) o.status = "Pending";
+    if(o.stockDeducted==null) o.stockDeducted=false;
+  });
+  state.shipments.forEach(sh=>{ sh.cod = Number(sh.cod)||0; sh.deliveryCharges = Number(sh.deliveryCharges)||0; });
+  state.returns.forEach(r=>{ r.quantity = Number(r.quantity)||0; if(r.restocked==null) r.restocked=false; });
+  state.settlements.forEach(st=>{
+    st.codCollected = Number(st.codCollected)||0; st.courierCharges = Number(st.courierCharges)||0; st.serviceCharges = Number(st.serviceCharges)||0;
+    if(st.paid==null) st.paid=false;
+  });
+  state.expenses.forEach(e=>{ e.amount = Number(e.amount)||0; });
+  state.inventoryLogs.forEach(l=>{ l.qty = Number(l.qty)||0; });
+}
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(err){ console.warn("Valtrix WMS: failed to save local cache.", err); }
+  if(cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(queuePushToCloud, 400);
+  updateSyncIndicator();
+}
+function queuePushToCloud(){ pushChain = pushChain.then(pushStateToCloud).catch(()=>{}); }
+async function pushStateToCloud(){
+  if(!cloud) return;
+  isCloudSaving = true; updateSyncIndicator();
+  try{
+    let toPush = state;
+    try{
+      const { data: latest, error: fetchErr } = await cloud.from("app_state").select("data").eq("id", CLOUD_ROW_ID).maybeSingle();
+      if(!fetchErr && latest && latest.data){
+        toPush = mergeStates(latest.data, state);
+        state = toPush;
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      }
+    }catch(fetchErr){ console.warn("Valtrix WMS: could not fetch latest cloud data before saving — pushing local copy as-is.", fetchErr); }
+    const stamp = new Date().toISOString();
+    pendingEchoTimestamps.add(stamp);
+    const { error } = await cloud.from("app_state").upsert({ id: CLOUD_ROW_ID, data: toPush, updated_at: stamp });
+    if(error) throw error;
+    lastPushFailed = false;
+  }catch(err){
+    lastPushFailed = true;
+    console.warn("Valtrix WMS: failed to sync to cloud.", err);
+    showToast("Could not sync to cloud — check your connection.", "error");
+  }finally{ isCloudSaving = false; updateSyncIndicator(); }
+}
+function renderAllPages(){
+  renderDashboard(); renderSellersPage(); renderProductsPage(); renderInventoryPage();
+  renderOrdersPage(); renderShipmentsPage(); renderReturnsPage(); renderSettlementsPage();
+  renderExpensesPage(); refreshAllSelectDependents();
+}
+function subscribeToCloudUpdates(){
+  if(!cloud) return;
+  cloud.channel("app_state_sync").on(
+    "postgres_changes",
+    { event:"UPDATE", schema:"public", table:"app_state", filter:`id=eq.${CLOUD_ROW_ID}` },
+    (payload)=>{
+      const incomingStamp = payload.new && payload.new.updated_at;
+      if(incomingStamp && pendingEchoTimestamps.has(incomingStamp)){ pendingEchoTimestamps.delete(incomingStamp); return; }
+      const incoming = payload.new && payload.new.data;
+      if(!incoming) return;
+      state = mergeStates(incoming, state);
+      sanitizeState();
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      renderAllPages();
+      showToast("Updated with changes from another device.", "success");
+    }
+  ).subscribe();
+
+  window.addEventListener("online", ()=>{ if(cloud) queuePushToCloud(); });
+  setInterval(()=>{ if(cloud && lastPushFailed && navigator.onLine !== false) queuePushToCloud(); }, 20000);
+
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.hidden) stopPollTimer(); else schedulePoll(0);
+  });
+  if(!document.hidden) startPolling();
+}
+function stopPollTimer(){ if(pollTimer){ clearTimeout(pollTimer); pollTimer=null; } }
+function schedulePoll(delay){ stopPollTimer(); pollTimer = setTimeout(pollSharedStateOnce, delay); }
+function startPolling(){ if(pollTimer || pollInFlight) return; schedulePoll(POLL_INTERVAL_MS); }
+async function pollSharedStateOnce(){
+  pollTimer = null;
+  if(!cloud){ schedulePoll(POLL_INTERVAL_MS); return; }
+  if(pollInFlight) return;
+  if(document.hidden) return;
+  if(isCloudSaving){ schedulePoll(POLL_INTERVAL_MS); return; }
+  pollInFlight = true;
+  try{
+    const { data, error } = await cloud.from("app_state").select("updated_at").eq("id", CLOUD_ROW_ID).maybeSingle();
+    if(error) throw error;
+    const remoteStamp = data && data.updated_at;
+    if(!remoteStamp){ pollBackoffMs = POLL_INTERVAL_MS; return; }
+    if(lastKnownRemoteUpdatedAt === null){ lastKnownRemoteUpdatedAt = remoteStamp; pollBackoffMs = POLL_INTERVAL_MS; return; }
+    if(remoteStamp === lastKnownRemoteUpdatedAt){ pollBackoffMs = POLL_INTERVAL_MS; return; }
+    if(pendingEchoTimestamps.has(remoteStamp)){ pendingEchoTimestamps.delete(remoteStamp); lastKnownRemoteUpdatedAt = remoteStamp; pollBackoffMs = POLL_INTERVAL_MS; return; }
+
+    const { data: full, error: fullErr } = await cloud.from("app_state").select("data, updated_at").eq("id", CLOUD_ROW_ID).maybeSingle();
+    if(fullErr) throw fullErr;
+    if(!full || !full.data){ pollBackoffMs = POLL_INTERVAL_MS; return; }
+
+    state = mergeStates(full.data, state);
+    sanitizeState();
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    renderAllPages();
+    lastKnownRemoteUpdatedAt = full.updated_at || remoteStamp;
+    pollBackoffMs = POLL_INTERVAL_MS;
+  }catch(err){
+    console.warn("Valtrix WMS: background poll failed.", err);
+    pollBackoffMs = Math.min(pollBackoffMs*2, POLL_BACKOFF_MAX_MS);
+  }finally{
+    pollInFlight = false;
+    if(!document.hidden) schedulePoll(pollBackoffMs);
+  }
+}
+function updateSyncIndicator(){
+  if(!els.syncDot) return;
+  els.syncDot.className = "sync-dot";
+  if(!cloud){ els.syncDot.classList.add("offline"); els.syncLabel.textContent = "Local only"; return; }
+  if(isCloudSaving){ els.syncDot.classList.add("syncing"); els.syncLabel.textContent = "Syncing…"; return; }
+  if(lastPushFailed){ els.syncDot.classList.add("offline"); els.syncLabel.textContent = "Sync failed"; return; }
+  els.syncLabel.textContent = "Synced";
+}
+
+/* ============================================================
+   SECTION 3: UTILITIES
+============================================================ */
+function generateId(prefix){ return (prefix||"id")+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8); }
+function nowIso(){ return new Date().toISOString(); }
+function escapeHtml(str){ return String(str==null?"":str).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function todayKey(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function formatMoney(n){ n = Number(n)||0; return "PKR " + n.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2}); }
+function formatDate(dstr){ if(!dstr) return "—"; try{ const d=new Date(dstr+"T00:00:00"); return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }catch(e){ return dstr; } }
+function shortCode(prefix, id){ return prefix + "-" + String(id).split("_").pop().toUpperCase(); }
+function badgeHtml(text){ const cls = STATUS_BADGE[text] || "muted"; return `<span class="badge badge-${cls}">${escapeHtml(text)}</span>`; }
+function getById(collection, id){ return (state[collection]||[]).find(x=>x.id===id) || null; }
+function addRecord(collection, obj){
+  const now = nowIso();
+  obj.id = generateId(collection.slice(0,3));
+  obj.createdAt = now; obj.updatedAt = now;
+  state[collection].push(obj);
+  saveState();
+  return obj;
+}
+function updateRecord(collection, id, patch){
+  const item = getById(collection, id);
+  if(!item) return null;
+  Object.assign(item, patch);
+  item.updatedAt = nowIso();
+  saveState();
+  return item;
+}
+function deleteRecord(collection, id){
+  const idx = state[collection].findIndex(x=>x.id===id);
+  if(idx<0) return;
+  state[collection].splice(idx,1);
+  state.tombstones[collection][id] = Date.now();
+  saveState();
+}
+
+/* ============================================================
+   SECTION 4: TOASTS / CONFIRM
+============================================================ */
+function showToast(message, type){
+  const toast = document.createElement("div");
+  toast.className = "toast " + (type||"info");
+  toast.textContent = message;
+  els.toastContainer.appendChild(toast);
+  setTimeout(()=>{ toast.style.opacity="0"; toast.style.transition="opacity .3s ease"; setTimeout(()=>toast.remove(),320); }, 3000);
+}
+let confirmCallback = null;
+function confirmAction(message, onConfirm){
+  els.confirmMessage.textContent = message;
+  confirmCallback = onConfirm;
+  els.confirmModal.classList.add("show");
+}
+function closeConfirmModal(){ els.confirmModal.classList.remove("show"); confirmCallback = null; }
+
+/* ============================================================
+   SECTION 5: GENERIC MODAL
+============================================================ */
+function openModal(cfg){
+  const { title, fields, data, onSubmit } = cfg;
+  const d = data || {};
+  els.modalTitle.textContent = title;
+  let html = "";
+  fields.forEach(f=>{
+    const val = d[f.key] !== undefined ? d[f.key] : (f.default !== undefined ? f.default : "");
+    const reqAttr = f.required ? "required" : "";
+    const reqStar = f.required ? " *" : "";
+    if(f.type === "textarea"){
+      html += `<div class="field-group"><label>${f.label}${reqStar}</label><textarea data-field="${f.key}" rows="2" ${reqAttr}>${escapeHtml(val)}</textarea></div>`;
+    }else if(f.type === "select"){
+      let opts = '<option value="">-- Select --</option>';
+      (f.options||[]).forEach(o=>{
+        const sel = String(o.value)===String(val) ? "selected" : "";
+        opts += `<option value="${escapeHtml(o.value)}" ${sel}>${escapeHtml(o.label)}</option>`;
+      });
+      html += `<div class="field-group"><label>${f.label}${reqStar}</label><select data-field="${f.key}" ${reqAttr}>${opts}</select></div>`;
+    }else if(f.type === "checkbox"){
+      const checked = val ? "checked" : "";
+      html += `<div class="field-group field-checkbox"><label><input type="checkbox" data-field="${f.key}" ${checked}/> ${f.label}</label></div>`;
+    }else if(f.type === "number"){
+      html += `<div class="field-group"><label>${f.label}${reqStar}</label><input type="number" step="${f.step||"any"}" data-field="${f.key}" value="${val!==""&&val!=null?val:0}" ${reqAttr}/></div>`;
+    }else if(f.type === "date"){
+      html += `<div class="field-group"><label>${f.label}${reqStar}</label><input type="date" data-field="${f.key}" value="${val||""}" ${reqAttr}/></div>`;
+    }else{
+      html += `<div class="field-group"><label>${f.label}${reqStar}</label><input type="text" data-field="${f.key}" value="${escapeHtml(val)}" ${reqAttr}/></div>`;
+    }
+  });
+  els.modalFieldsContainer.innerHTML = html;
+  els.modalOverlay.classList.add("show");
+  els.modalForm.onsubmit = function(e){
+    e.preventDefault();
+    const out = {};
+    fields.forEach(f=>{
+      const el = els.modalFieldsContainer.querySelector(`[data-field="${f.key}"]`);
+      if(!el) return;
+      if(f.type==="checkbox") out[f.key] = el.checked;
+      else if(f.type==="number") out[f.key] = el.value==="" ? 0 : Number(el.value);
+      else out[f.key] = el.value;
+    });
+    onSubmit(out);
+    closeModal();
+  };
+  const firstInput = els.modalFieldsContainer.querySelector("input,select,textarea");
+  setTimeout(()=>{ if(firstInput) firstInput.focus(); }, 50);
+}
+function closeModal(){ els.modalOverlay.classList.remove("show"); els.modalForm.onsubmit=null; }
+
+function sellerOptions(){ return state.sellers.map(s=>({value:s.id,label:s.businessName||"(unnamed)"})); }
+function productOptions(){ return state.products.map(p=>({value:p.id,label:(p.sku?p.sku+" — ":"")+p.name})); }
+function orderOptions(){ return state.orders.map(o=>({value:o.id,label:shortCode("ORD",o.id)+" — "+(o.customerName||"")})); }
+
+/* ============================================================
+   SECTION 6: ENTITY MODALS
+============================================================ */
+const SELLER_FIELDS = [
+  {key:"businessName",label:"Business Name",type:"text",required:true},
+  {key:"ownerName",label:"Owner / Contact Name",type:"text"},
+  {key:"phone",label:"Phone",type:"text"},
+  {key:"whatsapp",label:"WhatsApp",type:"text"},
+  {key:"address",label:"Address",type:"textarea"},
+  {key:"notes",label:"Notes",type:"textarea"},
+  {key:"active",label:"Active",type:"checkbox",default:true}
+];
+function openSellerModal(existing){
+  openModal({
+    title: existing ? "Edit Seller" : "Add Seller",
+    fields: SELLER_FIELDS,
+    data: existing || {active:true},
+    onSubmit(vals){
+      if(!vals.businessName || !vals.businessName.trim()){ showToast("Business name is required.","error"); return; }
+      if(existing){ updateRecord("sellers", existing.id, vals); showToast("Seller updated.","success"); }
+      else{ addRecord("sellers", vals); showToast("Seller added.","success"); }
+      renderSellersPage(); renderDashboard(); refreshAllSelectDependents();
+    }
+  });
+}
+
+function buildProductFields(){
+  return [
+    {key:"sku",label:"SKU / Product ID",type:"text"},
+    {key:"name",label:"Product Name",type:"text",required:true},
+    {key:"sellerId",label:"Seller",type:"select",options:sellerOptions()},
+    {key:"category",label:"Category",type:"text"},
+    {key:"costPrice",label:"Cost Price (PKR)",type:"number",step:"0.01"},
+    {key:"sellingPrice",label:"Selling Price (PKR)",type:"number",step:"0.01"},
+    {key:"stock",label:"Stock Qty",type:"number",step:"1"},
+    {key:"lowStockThreshold",label:"Low Stock Threshold",type:"number",step:"1",default: Number(state.settings.defaultLowStock)||5},
+    {key:"location",label:"Storage Location",type:"text"},
+    {key:"notes",label:"Notes",type:"textarea"}
+  ];
+}
+function openProductModal(existing){
+  openModal({
+    title: existing ? "Edit Product" : "Add Product",
+    fields: buildProductFields(),
+    data: existing || {},
+    onSubmit(vals){
+      if(!vals.name || !vals.name.trim()){ showToast("Product name is required.","error"); return; }
+      if(existing){ updateRecord("products", existing.id, vals); showToast("Product updated.","success"); }
+      else{ addRecord("products", vals); showToast("Product added.","success"); }
+      renderProductsPage(); renderInventoryPage(); renderDashboard(); refreshAllSelectDependents();
+    }
+  });
+}
+
+function openAdjustStockModal(product){
+  openModal({
+    title: "Adjust Stock — " + (product ? product.name : ""),
+    fields: [
+      {key:"type",label:"Adjustment Type",type:"select",options:[{value:"in",label:"Stock In (+)"},{value:"out",label:"Stock Out (-)"},{value:"set",label:"Set Exact Quantity"}],required:true},
+      {key:"qty",label:"Quantity",type:"number",step:"1",required:true},
+      {key:"reason",label:"Reason",type:"text"},
+      {key:"notes",label:"Notes",type:"textarea"}
+    ],
+    data:{type:"in",qty:0},
+    onSubmit(vals){
+      if(!product) return;
+      const before = Number(product.stock)||0;
+      let after = before;
+      if(vals.type==="in") after = before + Number(vals.qty||0);
+      else if(vals.type==="out") after = before - Number(vals.qty||0);
+      else after = Number(vals.qty||0);
+      updateRecord("products", product.id, {stock: after});
+      addRecord("inventoryLogs", {productId:product.id, type:vals.type, qty:Number(vals.qty||0), reason:vals.reason||"Manual adjustment", notes:vals.notes||""});
+      showToast("Stock adjusted for "+product.name+".","success");
+      renderInventoryPage(); renderProductsPage(); renderDashboard();
+    }
+  });
+}
+
+function openOrderModal(existing){
+  els.modalTitle.textContent = existing ? "Edit Order" : "Add Order";
+  const sOpts = sellerOptions();
+  let sellerSelectHtml = '<option value="">-- Select Seller --</option>' + sOpts.map(o=>`<option value="${escapeHtml(o.value)}" ${existing&&existing.sellerId===o.value?"selected":""}>${escapeHtml(o.label)}</option>`).join("");
+  const statusOptsHtml = ORDER_STATUSES.map(s=>`<option value="${s}" ${existing&&existing.status===s?"selected":""}>${s}</option>`).join("");
+  els.modalFieldsContainer.innerHTML = `
+    <div class="field-group"><label>Seller *</label><select id="ordSeller">${sellerSelectHtml}</select></div>
+    <div class="form-grid-2">
+      <div class="field-group"><label>Customer Name *</label><input type="text" id="ordCustName" value="${escapeHtml(existing?existing.customerName:"")}" required /></div>
+      <div class="field-group"><label>Customer Phone</label><input type="text" id="ordCustPhone" value="${escapeHtml(existing?existing.customerPhone:"")}" /></div>
+    </div>
+    <div class="field-group"><label>Customer Address</label><textarea id="ordCustAddr" rows="2">${escapeHtml(existing?existing.customerAddress:"")}</textarea></div>
+    <div class="form-grid-2">
+      <div class="field-group"><label>Order Date</label><input type="date" id="ordDate" value="${existing?existing.date:todayKey()}" /></div>
+      <div class="field-group"><label>Status</label><select id="ordStatus">${statusOptsHtml}</select></div>
+    </div>
+    <div class="order-items-editor">
+      <label>Products &amp; Quantities</label>
+      <div id="ordItemsRows"></div>
+      <button type="button" class="btn btn-outline btn-sm" id="ordAddItemRow">+ Add Product</button>
+    </div>
+    <div class="form-grid-2">
+      <div class="field-group"><label>Order Amount (PKR)</label><input type="number" step="0.01" id="ordAmount" value="${existing?existing.amount:0}" /></div>
+      <div class="field-group"><label>COD Amount (PKR)</label><input type="number" step="0.01" id="ordCod" value="${existing?existing.codAmount:0}" /></div>
+    </div>
+    <div class="field-group"><label>Notes</label><textarea id="ordNotes" rows="2">${escapeHtml(existing?existing.notes:"")}</textarea></div>
+  `;
+  const rowsWrap = document.getElementById("ordItemsRows");
+  function productSelectHtml(selectedId){
+    return '<option value="">-- Product --</option>' + state.products.map(p=>`<option value="${p.id}" ${p.id===selectedId?"selected":""}>${escapeHtml(p.name)}</option>`).join("");
+  }
+  function addItemRow(item){
+    item = item || {productId:"",qty:1};
+    const row = document.createElement("div");
+    row.className = "item-row";
+    row.innerHTML = `<select class="ord-item-product">${productSelectHtml(item.productId)}</select><input type="number" class="ord-item-qty" min="1" step="1" value="${item.qty||1}" /><div class="item-price">—</div><button type="button">✕</button>`;
+    row.querySelector(".ord-item-product").addEventListener("change", recomputeAmount);
+    row.querySelector(".ord-item-qty").addEventListener("input", recomputeAmount);
+    row.querySelector("button").addEventListener("click", ()=>{ row.remove(); recomputeAmount(); });
+    rowsWrap.appendChild(row);
+    recomputeAmount();
+  }
+  function recomputeAmount(){
+    let total = 0;
+    rowsWrap.querySelectorAll(".item-row").forEach(row=>{
+      const pid = row.querySelector(".ord-item-product").value;
+      const qty = Number(row.querySelector(".ord-item-qty").value)||0;
+      const p = getById("products", pid);
+      const priceEl = row.querySelector(".item-price");
+      if(p){ priceEl.textContent = formatMoney(p.sellingPrice); total += (Number(p.sellingPrice)||0) * qty; }
+      else{ priceEl.textContent = "—"; }
+    });
+    document.getElementById("ordAmount").value = total;
+  }
+  document.getElementById("ordAddItemRow").addEventListener("click", ()=>addItemRow());
+  if(existing && Array.isArray(existing.items) && existing.items.length){
+    existing.items.forEach(it=>addItemRow(it));
+  }else{
+    addItemRow();
+  }
+  els.modalOverlay.classList.add("show");
+  els.modalForm.onsubmit = function(e){
+    e.preventDefault();
+    const sellerId = document.getElementById("ordSeller").value;
+    const customerName = document.getElementById("ordCustName").value.trim();
+    if(!sellerId){ showToast("Please select a seller.","error"); return; }
+    if(!customerName){ showToast("Customer name is required.","error"); return; }
+    const items = [];
+    rowsWrap.querySelectorAll(".item-row").forEach(row=>{
+      const pid = row.querySelector(".ord-item-product").value;
+      const qty = Number(row.querySelector(".ord-item-qty").value)||0;
+      if(pid && qty>0) items.push({productId:pid, qty});
+    });
+    const vals = {
+      sellerId, customerName,
+      customerPhone: document.getElementById("ordCustPhone").value,
+      customerAddress: document.getElementById("ordCustAddr").value,
+      date: document.getElementById("ordDate").value || todayKey(),
+      status: document.getElementById("ordStatus").value || "Pending",
+      amount: Number(document.getElementById("ordAmount").value)||0,
+      codAmount: Number(document.getElementById("ordCod").value)||0,
+      notes: document.getElementById("ordNotes").value,
+      items
+    };
+    const prevStatus = existing ? existing.status : null;
+    let saved;
+    if(existing){ saved = updateRecord("orders", existing.id, vals); showToast("Order updated.","success"); }
+    else{ saved = addRecord("orders", vals); showToast("Order added.","success"); }
+    maybeAdjustStockForStatus(saved, prevStatus, vals.status);
+    saveState();
+    closeModal();
+    renderOrdersPage(); renderInventoryPage(); renderProductsPage(); renderDashboard(); refreshAllSelectDependents();
+  };
+}
+function maybeAdjustStockForStatus(order, prevStatus, newStatus){
+  if(!order) return;
+  if(newStatus === "Shipped" && !order.stockDeducted){
+    (order.items||[]).forEach(it=>{
+      const p = getById("products", it.productId);
+      if(p){
+        p.stock = (Number(p.stock)||0) - (Number(it.qty)||0);
+        p.updatedAt = nowIso();
+        addRecord("inventoryLogs", {productId:p.id, type:"out", qty:it.qty, reason:"Order shipped", refOrderId:order.id});
+      }
+    });
+    order.stockDeducted = true;
+  }else if((newStatus==="Cancelled" || newStatus==="Returned") && order.stockDeducted && prevStatus!=="Cancelled" && prevStatus!=="Returned"){
+    (order.items||[]).forEach(it=>{
+      const p = getById("products", it.productId);
+      if(p){
+        p.stock = (Number(p.stock)||0) + (Number(it.qty)||0);
+        p.updatedAt = nowIso();
+        addRecord("inventoryLogs", {productId:p.id, type:"in", qty:it.qty, reason:"Order "+newStatus.toLowerCase(), refOrderId:order.id});
+      }
+    });
+    order.stockDeducted = false;
+  }
+}
+function changeOrderStatus(id, newStatus){
+  const order = getById("orders", id);
+  if(!order) return;
+  const prevStatus = order.status;
+  updateRecord("orders", id, {status:newStatus});
+  maybeAdjustStockForStatus(order, prevStatus, newStatus);
+  saveState();
+  renderOrdersPage(); renderInventoryPage(); renderProductsPage(); renderDashboard();
+  showToast("Order status updated.","success");
+}
+
+function buildShipmentFields(existing){
+  return [
+    {key:"orderId",label:"Order",type:"select",options:orderOptions(),required:true},
+    {key:"courier",label:"Courier",type:"select",options:COURIERS.map(c=>({value:c,label:c})),required:true},
+    {key:"trackingNumber",label:"Tracking Number",type:"text"},
+    {key:"shipmentDate",label:"Shipment Date",type:"date",default:todayKey()},
+    {key:"deliveryStatus",label:"Delivery Status",type:"select",options:DELIVERY_STATUSES.map(s=>({value:s,label:s})),default:"Pending Pickup"},
+    {key:"cod",label:"COD (PKR)",type:"number",step:"0.01"},
+    {key:"deliveryCharges",label:"Delivery Charges (PKR)",type:"number",step:"0.01"},
+    {key:"notes",label:"Notes",type:"textarea"}
+  ];
+}
+function openShipmentModal(existing, presetOrderId){
+  const data = existing || (presetOrderId ? {orderId:presetOrderId, cod:(getById("orders",presetOrderId)||{}).codAmount||0} : {});
+  openModal({
+    title: existing ? "Edit Shipment" : "Add Shipment",
+    fields: buildShipmentFields(existing),
+    data,
+    onSubmit(vals){
+      if(!vals.orderId){ showToast("Please select an order.","error"); return; }
+      let saved;
+      if(existing){ saved = updateRecord("shipments", existing.id, vals); showToast("Shipment updated.","success"); }
+      else{ saved = addRecord("shipments", vals); showToast("Shipment added.","success"); }
+      applyShipmentSideEffects(saved);
+      renderShipmentsPage(); renderOrdersPage(); renderInventoryPage(); renderProductsPage(); renderDashboard(); refreshAllSelectDependents();
+    }
+  });
+}
+function applyShipmentSideEffects(shipment){
+  const order = getById("orders", shipment.orderId);
+  if(!order) return;
+  const prevStatus = order.status;
+  if(shipment.deliveryStatus === "Delivered" && order.status !== "Delivered" && order.status !== "Cancelled"){
+    updateRecord("orders", order.id, {status:"Delivered"});
+    maybeAdjustStockForStatus(order, prevStatus, "Delivered");
+  }else if(["Pending","Packed","Ready to Ship"].includes(order.status)){
+    updateRecord("orders", order.id, {status:"Shipped"});
+    maybeAdjustStockForStatus(order, prevStatus, "Shipped");
+  }
+  saveState();
+}
+function changeShipmentStatus(id, newStatus){
+  const sh = getById("shipments", id);
+  if(!sh) return;
+  updateRecord("shipments", id, {deliveryStatus:newStatus});
+  applyShipmentSideEffects(sh);
+  renderShipmentsPage(); renderOrdersPage(); renderDashboard();
+  showToast("Shipment status updated.","success");
+}
+
+function buildReturnFields(){
+  return [
+    {key:"orderId",label:"Order",type:"select",options:orderOptions(),required:true},
+    {key:"sellerId",label:"Seller",type:"select",options:sellerOptions()},
+    {key:"productId",label:"Product",type:"select",options:productOptions(),required:true},
+    {key:"quantity",label:"Quantity",type:"number",step:"1",default:1},
+    {key:"reason",label:"Reason",type:"text"},
+    {key:"courier",label:"Courier",type:"select",options:COURIERS.map(c=>({value:c,label:c}))},
+    {key:"date",label:"Return Date",type:"date",default:todayKey()},
+    {key:"condition",label:"Condition",type:"select",options:RETURN_CONDITIONS.map(c=>({value:c,label:c}))},
+    {key:"restocked",label:"Restock this quantity into inventory",type:"checkbox"},
+    {key:"notes",label:"Notes",type:"textarea"}
+  ];
+}
+function openReturnModal(existing){
+  openModal({
+    title: existing ? "Edit Return" : "Add Return",
+    fields: buildReturnFields(),
+    data: existing || {},
+    onSubmit(vals){
+      if(!vals.orderId || !vals.productId){ showToast("Order and product are required.","error"); return; }
+      if(!vals.sellerId){ const ord = getById("orders", vals.orderId); if(ord) vals.sellerId = ord.sellerId; }
+      let saved;
+      const wasRestocked = existing ? !!existing.restocked : false;
+      if(existing){ saved = updateRecord("returns", existing.id, vals); showToast("Return updated.","success"); }
+      else{ saved = addRecord("returns", vals); showToast("Return added.","success"); }
+      if(vals.restocked && !wasRestocked){
+        const p = getById("products", vals.productId);
+        if(p){
+          p.stock = (Number(p.stock)||0) + (Number(vals.quantity)||0);
+          p.updatedAt = nowIso();
+          addRecord("inventoryLogs", {productId:p.id, type:"in", qty:vals.quantity, reason:"Return restock", refReturnId:saved.id});
+        }
+      }
+      saveState();
+      renderReturnsPage(); renderInventoryPage(); renderProductsPage(); renderDashboard();
+    }
+  });
+}
+
+function buildSettlementFields(){
+  return [
+    {key:"sellerId",label:"Seller",type:"select",options:sellerOptions(),required:true},
+    {key:"periodLabel",label:"Period (e.g. Sep 2026)",type:"text"},
+    {key:"codCollected",label:"COD Collected (PKR)",type:"number",step:"0.01"},
+    {key:"courierCharges",label:"Courier Charges (PKR)",type:"number",step:"0.01"},
+    {key:"serviceCharges",label:"Valtrix Service Charges (PKR)",type:"number",step:"0.01",default:Number(state.settings.defaultServiceCharge)||0},
+    {key:"paid",label:"Paid to Seller",type:"checkbox"},
+    {key:"settlementDate",label:"Settlement Date",type:"date",default:todayKey()},
+    {key:"notes",label:"Notes",type:"textarea"}
+  ];
+}
+function openSettlementModal(existing, preset){
+  openModal({
+    title: existing ? "Edit Settlement" : "Add Settlement",
+    fields: buildSettlementFields(),
+    data: existing || preset || {},
+    onSubmit(vals){
+      if(!vals.sellerId){ showToast("Please select a seller.","error"); return; }
+      if(existing){ updateRecord("settlements", existing.id, vals); showToast("Settlement updated.","success"); }
+      else{ addRecord("settlements", vals); showToast("Settlement added.","success"); }
+      renderSettlementsPage(); renderDashboard(); refreshAllSelectDependents();
+    }
+  });
+}
+
+function buildExpenseFields(){
+  return [
+    {key:"date",label:"Date",type:"date",default:todayKey()},
+    {key:"category",label:"Category",type:"select",options:EXPENSE_CATEGORIES.map(c=>({value:c,label:c}))},
+    {key:"description",label:"Description",type:"text"},
+    {key:"amount",label:"Amount (PKR)",type:"number",step:"0.01",required:true},
+    {key:"notes",label:"Notes",type:"textarea"}
+  ];
+}
+function openExpenseModal(existing){
+  openModal({
+    title: existing ? "Edit Expense" : "Add Expense",
+    fields: buildExpenseFields(),
+    data: existing || {},
+    onSubmit(vals){
+      if(existing){ updateRecord("expenses", existing.id, vals); showToast("Expense updated.","success"); }
+      else{ addRecord("expenses", vals); showToast("Expense added.","success"); }
+      renderExpensesPage(); renderDashboard(); refreshAllSelectDependents();
+    }
+  });
+}
+
+/* ============================================================
+   SECTION 7: COMPUTATIONS
+============================================================ */
+function computeSellerCod(sellerId){
+  const delivered = state.orders.filter(o=>o.sellerId===sellerId && o.status==="Delivered");
+  const codTotal = delivered.reduce((sum,o)=>sum + (Number(o.codAmount)||0), 0);
+  const settled = state.settlements.filter(s=>s.sellerId===sellerId).reduce((sum,s)=>sum + (Number(s.codCollected)||0), 0);
+  return { codTotal, settled, outstanding: Math.max(0, codTotal - settled) };
+}
+function computeSettlementPayable(s){ return (Number(s.codCollected)||0) - (Number(s.courierCharges)||0) - (Number(s.serviceCharges)||0); }
+function computeTotalSellerPayables(){
+  return state.settlements.filter(s=>!s.paid).reduce((sum,s)=>sum + computeSettlementPayable(s), 0);
+}
+function computeLowStockProducts(){
+  return state.products.filter(p=> (Number(p.stock)||0) <= (Number(p.lowStockThreshold)||0));
+}
+
+/* ============================================================
+   SECTION 8: RENDER — DASHBOARD
+============================================================ */
+function destroyChart(key){ if(charts[key]){ charts[key].destroy(); charts[key]=null; } }
+function themeColor(varName){ return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || "#888"; }
+
+function renderStatCard(icon, value, label, bg, color){
+  return `<div class="stat-card"><div class="stat-icon" style="background:${bg};color:${color};">${icon}</div><div><div class="stat-card-value">${value}</div><div class="stat-card-label">${label}</div></div></div>`;
+}
+function renderDashboard(){
+  const totalSellers = state.sellers.length;
+  const totalProducts = state.products.length;
+  const inventoryUnits = state.products.reduce((s,p)=>s+(Number(p.stock)||0),0);
+  const pending = state.orders.filter(o=>o.status==="Pending").length;
+  const shipped = state.orders.filter(o=>o.status==="Shipped").length;
+  const delivered = state.orders.filter(o=>o.status==="Delivered").length;
+  const returned = state.orders.filter(o=>o.status==="Returned").length;
+  const codPending = state.sellers.reduce((s,sel)=>s+computeSellerCod(sel.id).outstanding,0);
+  const payables = computeTotalSellerPayables();
+  const today = todayKey();
+  const todayOrders = state.orders.filter(o=>o.date===today);
+  const todayRevenue = todayOrders.reduce((s,o)=>s+(Number(o.amount)||0),0);
+
+  els.dashStatGrid.innerHTML = [
+    renderStatCard("🤝", totalSellers, "Total Sellers", "var(--info-bg)","var(--info)"),
+    renderStatCard("🏷️", totalProducts, "Total Products", "var(--purple-bg)","var(--purple)"),
+    renderStatCard("📦", inventoryUnits.toLocaleString(), "Inventory Units", "var(--muted-bg)","var(--muted)"),
+    renderStatCard("⏳", pending, "Pending Orders", "var(--warning-bg)","var(--warning)"),
+    renderStatCard("🚚", shipped, "Shipped", "var(--info-bg)","var(--info)"),
+    renderStatCard("✅", delivered, "Delivered", "var(--success-bg)","var(--success)"),
+    renderStatCard("↩️", returned, "Returned", "var(--danger-bg)","var(--danger)"),
+    renderStatCard("💵", formatMoney(codPending), "COD Pending", "var(--warning-bg)","var(--warning)"),
+    renderStatCard("💰", formatMoney(payables), "Seller Payables", "var(--danger-bg)","var(--danger)"),
+    renderStatCard("🧾", todayOrders.length, "Today's Orders", "var(--info-bg)","var(--info)"),
+    renderStatCard("📈", formatMoney(todayRevenue), "Today's Revenue", "var(--success-bg)","var(--success)")
+  ].join("");
+
+  renderOrdersStatusChart();
+  renderRevenueTrendChart();
+
+  const recent = [...state.orders].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt)).slice(0,6);
+  els.dashRecentOrders.innerHTML = recent.length ? recent.map(o=>{
+    const seller = getById("sellers", o.sellerId);
+    return `<div class="recent-order-row"><span>${shortCode("ORD",o.id)} — ${escapeHtml(o.customerName)}${seller?" · "+escapeHtml(seller.businessName):""}</span>${badgeHtml(o.status)}</div>`;
+  }).join("") : `<div class="empty-state">No orders yet.</div>`;
+
+  const lowStock = computeLowStockProducts();
+  els.dashLowStock.innerHTML = lowStock.length ? lowStock.slice(0,8).map(p=>{
+    return `<div class="low-stock-row"><span>${escapeHtml(p.name)} ${p.sku?"("+escapeHtml(p.sku)+")":""}</span><span class="badge badge-danger">${p.stock} left</span></div>`;
+  }).join("") : `<div class="empty-state">All products are well stocked. 🎉</div>`;
+}
+function renderOrdersStatusChart(){
+  const canvas = document.getElementById("ordersStatusChart");
+  if(!canvas || typeof Chart==="undefined") return;
+  const counts = ORDER_STATUSES.map(s=> state.orders.filter(o=>o.status===s).length);
+  destroyChart("ordersStatus");
+  charts.ordersStatus = new Chart(canvas.getContext("2d"), {
+    type:"bar",
+    data:{ labels: ORDER_STATUSES, datasets:[{ label:"Orders", data:counts, backgroundColor: themeColor("--accent") }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{ ticks:{ color: themeColor("--text-secondary"), font:{size:9} }, grid:{display:false} },
+               y:{ beginAtZero:true, ticks:{ color: themeColor("--text-secondary"), precision:0 }, grid:{ color: themeColor("--border") } } } }
+  });
+}
+function renderRevenueTrendChart(){
+  const canvas = document.getElementById("revenueTrendChart");
+  if(!canvas || typeof Chart==="undefined") return;
+  const days = [];
+  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")); }
+  const values = days.map(dk=> state.orders.filter(o=>o.date===dk).reduce((s,o)=>s+(Number(o.amount)||0),0));
+  const labels = days.map(dk=> dk.slice(5));
+  destroyChart("revenueTrend");
+  charts.revenueTrend = new Chart(canvas.getContext("2d"), {
+    type:"line",
+    data:{ labels, datasets:[{ label:"Revenue", data:values, borderColor: themeColor("--accent-2"), backgroundColor:"rgba(245,166,35,.18)", fill:true, tension:.35, borderWidth:2, pointRadius:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{ ticks:{ color: themeColor("--text-secondary"), font:{size:9} }, grid:{display:false} },
+               y:{ beginAtZero:true, ticks:{ color: themeColor("--text-secondary") }, grid:{ color: themeColor("--border") } } } }
+  });
+}
+
+/* ============================================================
+   SECTION 9: RENDER — SELLERS
+============================================================ */
+function renderSellersPage(){
+  const q = (els.sellerSearch.value||"").toLowerCase();
+  const rows = state.sellers.filter(s=> !q || (s.businessName||"").toLowerCase().includes(q) || (s.ownerName||"").toLowerCase().includes(q));
+  if(!rows.length){ els.sellersTbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">🤝</div>No sellers found.</div></td></tr>`; return; }
+  els.sellersTbody.innerHTML = rows.map(s=>`
+    <tr>
+      <td><strong>${escapeHtml(s.businessName)}</strong>${s.address?`<div style="font-size:.72rem;color:var(--text-secondary);">${escapeHtml(s.address)}</div>`:""}</td>
+      <td>${escapeHtml(s.ownerName||"—")}</td>
+      <td>${escapeHtml(s.phone||"—")}</td>
+      <td>${escapeHtml(s.whatsapp||"—")}</td>
+      <td>${s.active ? `<span class="badge badge-success">Active</span>` : `<span class="badge badge-muted">Inactive</span>`}</td>
+      <td class="cell-actions"><button class="icon-btn" data-action="edit-seller" data-id="${s.id}">✏️</button><button class="icon-btn danger" data-action="delete-seller" data-id="${s.id}">🗑️</button></td>
+    </tr>`).join("");
+}
+
+/* ============================================================
+   SECTION 10: RENDER — PRODUCTS
+============================================================ */
+function renderProductsPage(){
+  const q = (els.productSearch.value||"").toLowerCase();
+  const sellerFilter = els.productSellerFilter.value;
+  const rows = state.products.filter(p=>{
+    const matchQ = !q || (p.name||"").toLowerCase().includes(q) || (p.sku||"").toLowerCase().includes(q);
+    const matchS = !sellerFilter || p.sellerId===sellerFilter;
+    return matchQ && matchS;
+  });
+  if(!rows.length){ els.productsTbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">🏷️</div>No products found.</div></td></tr>`; return; }
+  els.productsTbody.innerHTML = rows.map(p=>{
+    const seller = getById("sellers", p.sellerId);
+    const low = (Number(p.stock)||0) <= (Number(p.lowStockThreshold)||0);
+    return `<tr>
+      <td>${escapeHtml(p.sku||"—")}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${seller?escapeHtml(seller.businessName):"—"}</td>
+      <td>${escapeHtml(p.category||"—")}</td>
+      <td>${formatMoney(p.costPrice)}</td>
+      <td>${formatMoney(p.sellingPrice)}</td>
+      <td>${low?`<span class="badge badge-danger">${p.stock}</span>`:`<span class="badge badge-success">${p.stock}</span>`}</td>
+      <td>${escapeHtml(p.location||"—")}</td>
+      <td class="cell-actions"><button class="icon-btn" data-action="edit-product" data-id="${p.id}">✏️</button><button class="icon-btn danger" data-action="delete-product" data-id="${p.id}">🗑️</button></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ============================================================
+   SECTION 11: RENDER — INVENTORY
+============================================================ */
+function renderInventoryPage(){
+  const q = (els.inventorySearch.value||"").toLowerCase();
+  const lowOnly = els.lowStockOnlyToggle.checked;
+  const rows = state.products.filter(p=>{
+    const matchQ = !q || (p.name||"").toLowerCase().includes(q) || (p.sku||"").toLowerCase().includes(q);
+    const low = (Number(p.stock)||0) <= (Number(p.lowStockThreshold)||0);
+    return matchQ && (!lowOnly || low);
+  });
+  if(!rows.length){ els.inventoryTbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📥</div>No matching products.</div></td></tr>`; }
+  else{
+    els.inventoryTbody.innerHTML = rows.map(p=>{
+      const seller = getById("sellers", p.sellerId);
+      const low = (Number(p.stock)||0) <= (Number(p.lowStockThreshold)||0);
+      return `<tr>
+        <td>${escapeHtml(p.sku||"—")}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${seller?escapeHtml(seller.businessName):"—"}</td>
+        <td>${escapeHtml(p.location||"—")}</td>
+        <td><strong>${p.stock}</strong></td>
+        <td>${p.lowStockThreshold}</td>
+        <td>${low?`<span class="badge badge-danger">Low Stock</span>`:`<span class="badge badge-success">OK</span>`}</td>
+        <td class="cell-actions"><button class="btn btn-outline btn-sm" data-action="adjust-stock" data-id="${p.id}">Adjust</button></td>
+      </tr>`;
+    }).join("");
+  }
+  const logs = [...state.inventoryLogs].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt)).slice(0,12);
+  els.inventoryLogTbody.innerHTML = logs.length ? logs.map(l=>{
+    const p = getById("products", l.productId);
+    const typeBadge = l.type==="in" ? "badge-success" : (l.type==="out" ? "badge-danger" : "badge-info");
+    return `<tr><td>${l.createdAt?new Date(l.createdAt).toLocaleDateString():"—"}</td><td>${p?escapeHtml(p.name):"(deleted product)"}</td><td><span class="badge ${typeBadge}">${escapeHtml(l.type)}</span></td><td>${l.qty}</td><td>${escapeHtml(l.reason||"—")}</td></tr>`;
+  }).join("") : `<tr><td colspan="5"><div class="empty-state">No stock movements yet.</div></td></tr>`;
+}
+
+/* ============================================================
+   SECTION 12: RENDER — ORDERS
+============================================================ */
+function renderOrdersPage(){
+  const q = (els.orderSearch.value||"").toLowerCase();
+  const statusFilter = els.orderStatusFilter.value;
+  const sellerFilter = els.orderSellerFilter.value;
+  const rows = state.orders.filter(o=>{
+    const code = shortCode("ORD", o.id).toLowerCase();
+    const matchQ = !q || code.includes(q) || (o.customerName||"").toLowerCase().includes(q) || (o.customerPhone||"").toLowerCase().includes(q);
+    const matchStatus = !statusFilter || o.status===statusFilter;
+    const matchSeller = !sellerFilter || o.sellerId===sellerFilter;
+    return matchQ && matchStatus && matchSeller;
+  }).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(!rows.length){ els.ordersTbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🧾</div>No orders found.</div></td></tr>`; return; }
+  const statusOpts = ORDER_STATUSES.map(s=>`<option value="${s}">${s}</option>`).join("");
+  els.ordersTbody.innerHTML = rows.map(o=>{
+    const seller = getById("sellers", o.sellerId);
+    return `<tr>
+      <td>${shortCode("ORD",o.id)}</td>
+      <td>${seller?escapeHtml(seller.businessName):"—"}</td>
+      <td>${escapeHtml(o.customerName)}${o.customerPhone?`<div style="font-size:.72rem;color:var(--text-secondary);">${escapeHtml(o.customerPhone)}</div>`:""}</td>
+      <td>${formatMoney(o.amount)}</td>
+      <td>${formatMoney(o.codAmount)}</td>
+      <td>${formatDate(o.date)}</td>
+      <td><select class="status-select" data-action="change-order-status" data-id="${o.id}">${statusOpts.replace(`value="${o.status}"`,`value="${o.status}" selected`)}</select></td>
+      <td class="cell-actions"><button class="icon-btn" data-action="ship-order" data-id="${o.id}" title="Add Shipment">🚚</button><button class="icon-btn" data-action="edit-order" data-id="${o.id}">✏️</button><button class="icon-btn danger" data-action="delete-order" data-id="${o.id}">🗑️</button></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ============================================================
+   SECTION 13: RENDER — SHIPMENTS
+============================================================ */
+function renderShipmentsPage(){
+  const q = (els.shipmentSearch.value||"").toLowerCase();
+  const courierFilter = els.shipmentCourierFilter.value;
+  const rows = state.shipments.filter(sh=>{
+    const order = getById("orders", sh.orderId);
+    const code = shortCode("ORD", sh.orderId).toLowerCase();
+    const matchQ = !q || (sh.trackingNumber||"").toLowerCase().includes(q) || code.includes(q) || (order && (order.customerName||"").toLowerCase().includes(q));
+    const matchC = !courierFilter || sh.courier===courierFilter;
+    return matchQ && matchC;
+  }).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(!rows.length){ els.shipmentsTbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🚚</div>No shipments found.</div></td></tr>`; return; }
+  const statusOpts = DELIVERY_STATUSES.map(s=>`<option value="${s}">${s}</option>`).join("");
+  els.shipmentsTbody.innerHTML = rows.map(sh=>{
+    const order = getById("orders", sh.orderId);
+    return `<tr>
+      <td>${order?shortCode("ORD",order.id):"(deleted)"}${order?`<div style="font-size:.72rem;color:var(--text-secondary);">${escapeHtml(order.customerName)}</div>`:""}</td>
+      <td>${escapeHtml(sh.courier||"—")}</td>
+      <td>${escapeHtml(sh.trackingNumber||"—")}</td>
+      <td>${formatDate(sh.shipmentDate)}</td>
+      <td>${formatMoney(sh.cod)}</td>
+      <td>${formatMoney(sh.deliveryCharges)}</td>
+      <td><select class="status-select" data-action="change-shipment-status" data-id="${sh.id}">${statusOpts.replace(`value="${sh.deliveryStatus}"`,`value="${sh.deliveryStatus}" selected`)}</select></td>
+      <td class="cell-actions"><button class="icon-btn" data-action="edit-shipment" data-id="${sh.id}">✏️</button><button class="icon-btn danger" data-action="delete-shipment" data-id="${sh.id}">🗑️</button></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ============================================================
+   SECTION 14: RENDER — RETURNS
+============================================================ */
+function renderReturnsPage(){
+  const q = (els.returnSearch.value||"").toLowerCase();
+  const rows = state.returns.filter(r=>{
+    const order = getById("orders", r.orderId);
+    const product = getById("products", r.productId);
+    return !q || (order && (order.customerName||"").toLowerCase().includes(q)) || (product && (product.name||"").toLowerCase().includes(q)) || (r.reason||"").toLowerCase().includes(q);
+  }).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(!rows.length){ els.returnsTbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">↩️</div>No returns recorded.</div></td></tr>`; return; }
+  els.returnsTbody.innerHTML = rows.map(r=>{
+    const order = getById("orders", r.orderId);
+    const seller = getById("sellers", r.sellerId);
+    const product = getById("products", r.productId);
+    return `<tr>
+      <td>${shortCode("RET",r.id)}</td>
+      <td>${order?shortCode("ORD",order.id):"—"}</td>
+      <td>${seller?escapeHtml(seller.businessName):"—"}</td>
+      <td>${product?escapeHtml(product.name):"—"}</td>
+      <td>${r.quantity}</td>
+      <td>${escapeHtml(r.reason||"—")}</td>
+      <td>${r.condition?badgeHtml(r.condition):"—"}</td>
+      <td>${r.restocked?`<span class="badge badge-success">Yes</span>`:`<span class="badge badge-muted">No</span>`}</td>
+      <td class="cell-actions"><button class="icon-btn" data-action="edit-return" data-id="${r.id}">✏️</button><button class="icon-btn danger" data-action="delete-return" data-id="${r.id}">🗑️</button></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ============================================================
+   SECTION 15: RENDER — SETTLEMENTS
+============================================================ */
+function renderSettlementsPage(){
+  els.outstandingTbody.innerHTML = state.sellers.length ? state.sellers.map(s=>{
+    const c = computeSellerCod(s.id);
+    return `<tr><td>${escapeHtml(s.businessName)}</td><td>${formatMoney(c.codTotal)}</td><td>${formatMoney(c.settled)}</td><td><strong>${formatMoney(c.outstanding)}</strong></td>
+      <td><button class="btn btn-outline btn-sm" data-action="quick-settle" data-id="${s.id}">+ Settle</button></td></tr>`;
+  }).join("") : `<tr><td colspan="5"><div class="empty-state">Add sellers to see outstanding COD.</div></td></tr>`;
+
+  const sellerFilter = els.settlementSellerFilter.value;
+  const paidFilter = els.settlementPaidFilter.value;
+  const rows = state.settlements.filter(s=>{
+    const matchS = !sellerFilter || s.sellerId===sellerFilter;
+    const matchP = !paidFilter || (paidFilter==="paid" ? s.paid : !s.paid);
+    return matchS && matchP;
+  }).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(!rows.length){ els.settlementsTbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">💰</div>No settlements recorded.</div></td></tr>`; return; }
+  els.settlementsTbody.innerHTML = rows.map(s=>{
+    const seller = getById("sellers", s.sellerId);
+    const payable = computeSettlementPayable(s);
+    return `<tr>
+      <td>${shortCode("SET",s.id)}</td>
+      <td>${seller?escapeHtml(seller.businessName):"—"}</td>
+      <td>${escapeHtml(s.periodLabel||"—")}</td>
+      <td>${formatMoney(s.codCollected)}</td>
+      <td>${formatMoney(s.courierCharges)}</td>
+      <td>${formatMoney(s.serviceCharges)}</td>
+      <td><strong>${formatMoney(payable)}</strong></td>
+      <td>${s.paid?`<span class="badge badge-success">Paid</span>`:`<span class="badge badge-warning">Unpaid</span>`}</td>
+      <td class="cell-actions"><button class="icon-btn" data-action="edit-settlement" data-id="${s.id}">✏️</button><button class="icon-btn danger" data-action="delete-settlement" data-id="${s.id}">🗑️</button></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ============================================================
+   SECTION 16: RENDER — EXPENSES
+============================================================ */
+function renderExpensesPage(){
+  const q = (els.expenseSearch.value||"").toLowerCase();
+  const catFilter = els.expenseCategoryFilter.value;
+  const rows = state.expenses.filter(e=>{
+    const matchQ = !q || (e.description||"").toLowerCase().includes(q) || (e.category||"").toLowerCase().includes(q);
+    const matchC = !catFilter || e.category===catFilter;
+    return matchQ && matchC;
+  }).sort((a,b)=> new Date(b.date||b.createdAt) - new Date(a.date||a.createdAt));
+  if(!rows.length){ els.expensesTbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">💳</div>No expenses recorded.</div></td></tr>`; return; }
+  els.expensesTbody.innerHTML = rows.map(e=>`
+    <tr><td>${formatDate(e.date)}</td><td>${badgeHtml(e.category||"Other")}</td><td>${escapeHtml(e.description||"—")}</td><td>${formatMoney(e.amount)}</td>
+    <td class="cell-actions"><button class="icon-btn" data-action="edit-expense" data-id="${e.id}">✏️</button><button class="icon-btn danger" data-action="delete-expense" data-id="${e.id}">🗑️</button></td></tr>`).join("");
+}
+
+/* ============================================================
+   SECTION 17: REPORTS
+============================================================ */
+function runReport(){
+  const from = els.reportFrom.value;
+  const to = els.reportTo.value;
+  const inRange = (d)=> (!from || d>=from) && (!to || d<=to);
+  const ordersInRange = state.orders.filter(o=>inRange(o.date));
+  const expensesInRange = state.expenses.filter(e=>inRange(e.date));
+  const settlementsInRange = state.settlements.filter(s=>inRange(s.settlementDate||""));
+  const revenue = ordersInRange.reduce((s,o)=>s+(Number(o.amount)||0),0);
+  const codCollected = ordersInRange.filter(o=>o.status==="Delivered").reduce((s,o)=>s+(Number(o.codAmount)||0),0);
+  const expTotal = expensesInRange.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const payablePaid = settlementsInRange.filter(s=>s.paid).reduce((s,st)=>s+computeSettlementPayable(st),0);
+
+  els.reportStatGrid.innerHTML = [
+    renderStatCard("🧾", ordersInRange.length, "Orders in Range", "var(--info-bg)","var(--info)"),
+    renderStatCard("📈", formatMoney(revenue), "Revenue", "var(--success-bg)","var(--success)"),
+    renderStatCard("💵", formatMoney(codCollected), "COD from Delivered", "var(--warning-bg)","var(--warning)"),
+    renderStatCard("💳", formatMoney(expTotal), "Expenses", "var(--danger-bg)","var(--danger)"),
+    renderStatCard("💰", formatMoney(payablePaid), "Settlements Paid Out", "var(--purple-bg)","var(--purple)")
+  ].join("");
+
+  els.reportSellerTbody.innerHTML = state.sellers.length ? state.sellers.map(s=>{
+    const sOrders = ordersInRange.filter(o=>o.sellerId===s.id);
+    const sRevenue = sOrders.reduce((sum,o)=>sum+(Number(o.amount)||0),0);
+    const sCod = sOrders.filter(o=>o.status==="Delivered").reduce((sum,o)=>sum+(Number(o.codAmount)||0),0);
+    const outstanding = computeSellerCod(s.id).outstanding;
+    return `<tr><td>${escapeHtml(s.businessName)}</td><td>${sOrders.length}</td><td>${formatMoney(sRevenue)}</td><td>${formatMoney(sCod)}</td><td>${formatMoney(outstanding)}</td></tr>`;
+  }).join("") : `<tr><td colspan="5"><div class="empty-state">No sellers yet.</div></td></tr>`;
+}
+function exportCsv(collection){
+  const rows = state[collection] || [];
+  if(!rows.length){ showToast("Nothing to export in "+collection+".","error"); return; }
+  const keys = Array.from(rows.reduce((set,r)=>{ Object.keys(r).forEach(k=>set.add(k)); return set; }, new Set()));
+  const esc = (v)=>{ if(v==null) return ""; if(typeof v==="object") v=JSON.stringify(v); const s=String(v).replace(/"/g,'""'); return `"${s}"`; };
+  const lines = [keys.join(",")];
+  rows.forEach(r=> lines.push(keys.map(k=>esc(r[k])).join(",")));
+  const blob = new Blob([lines.join("\n")], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "valtrix_"+collection+"_"+todayKey()+".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast("Exported "+collection+".csv","success");
+}
+
+/* ============================================================
+   SECTION 18: SELECT DEPENDENTS / FILTER OPTIONS
+============================================================ */
+function fillSelect(selectEl, options, keepFirst){
+  const current = selectEl.value;
+  const first = keepFirst ? selectEl.querySelector("option") : null;
+  selectEl.innerHTML = "";
+  if(first) selectEl.appendChild(first);
+  options.forEach(o=>{
+    const opt = document.createElement("option");
+    opt.value = o.value; opt.textContent = o.label;
+    selectEl.appendChild(opt);
+  });
+  if([...selectEl.options].some(o=>o.value===current)) selectEl.value = current;
+}
+function refreshAllSelectDependents(){
+  fillSelect(els.productSellerFilter, sellerOptions(), true);
+  fillSelect(els.orderSellerFilter, sellerOptions(), true);
+  fillSelect(els.settlementSellerFilter, sellerOptions(), true);
+  fillSelect(els.orderStatusFilter, ORDER_STATUSES.map(s=>({value:s,label:s})), true);
+  fillSelect(els.shipmentCourierFilter, COURIERS.map(c=>({value:c,label:c})), true);
+  fillSelect(els.expenseCategoryFilter, EXPENSE_CATEGORIES.map(c=>({value:c,label:c})), true);
+}
+
+/* ============================================================
+   SECTION 19: NAVIGATION
+============================================================ */
+const PAGE_META = {
+  dashboard:{title:"Dashboard",sub:"Overview of your warehouse operations"},
+  sellers:{title:"Sellers / Clients",sub:"Manage the sellers you fulfill orders for"},
+  products:{title:"Products",sub:"Catalog and pricing for every SKU"},
+  inventory:{title:"Inventory",sub:"Stock levels and movement history"},
+  orders:{title:"Orders",sub:"Track every order through fulfillment"},
+  shipments:{title:"Shipments",sub:"Courier handoffs and delivery status"},
+  returns:{title:"Returns",sub:"Manage returned items and restocking"},
+  settlements:{title:"COD / Settlements",sub:"Reconcile COD collections with sellers"},
+  expenses:{title:"Expenses",sub:"Track operating costs"},
+  reports:{title:"Reports",sub:"Aggregated insights and CSV export"},
+  settings:{title:"Settings",sub:"Company info and account controls"}
+};
+function switchPage(page){
+  ui.activePage = page;
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  const target = document.getElementById("page-"+page);
+  if(target) target.classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.getAttribute("data-page")===page));
+  const meta = PAGE_META[page] || {title:page,sub:""};
+  els.pageTitle.textContent = meta.title;
+  els.pageSubtitle.textContent = meta.sub;
+  if(page==="reports") runReport();
+  els.sidebar.classList.remove("open");
+}
+
+/* ============================================================
+   SECTION 20: EVENT DELEGATION
+============================================================ */
+function handleGlobalClick(e){
+  const t = e.target.closest("[data-action]");
+  if(!t) return;
+  const action = t.getAttribute("data-action");
+  const id = t.getAttribute("data-id");
+  switch(action){
+    case "nav": switchPage(t.getAttribute("data-page")); break;
+    case "add-seller": openSellerModal(); break;
+    case "edit-seller": openSellerModal(getById("sellers",id)); break;
+    case "delete-seller": confirmAction("Delete this seller? This cannot be undone.", ()=>{ deleteRecord("sellers",id); renderSellersPage(); renderDashboard(); refreshAllSelectDependents(); showToast("Seller deleted.","success"); }); break;
+
+    case "add-product": openProductModal(); break;
+    case "edit-product": openProductModal(getById("products",id)); break;
+    case "delete-product": confirmAction("Delete this product? This cannot be undone.", ()=>{ deleteRecord("products",id); renderProductsPage(); renderInventoryPage(); renderDashboard(); refreshAllSelectDependents(); showToast("Product deleted.","success"); }); break;
+    case "adjust-stock": openAdjustStockModal(getById("products",id)); break;
+
+    case "add-order": openOrderModal(); break;
+    case "edit-order": openOrderModal(getById("orders",id)); break;
+    case "delete-order": confirmAction("Delete this order? This cannot be undone.", ()=>{ deleteRecord("orders",id); renderOrdersPage(); renderDashboard(); showToast("Order deleted.","success"); }); break;
+    case "ship-order": openShipmentModal(null, id); break;
+
+    case "add-shipment": openShipmentModal(); break;
+    case "edit-shipment": openShipmentModal(getById("shipments",id)); break;
+    case "delete-shipment": confirmAction("Delete this shipment record? This cannot be undone.", ()=>{ deleteRecord("shipments",id); renderShipmentsPage(); renderDashboard(); showToast("Shipment deleted.","success"); }); break;
+
+    case "add-return": openReturnModal(); break;
+    case "edit-return": openReturnModal(getById("returns",id)); break;
+    case "delete-return": confirmAction("Delete this return record? This cannot be undone.", ()=>{ deleteRecord("returns",id); renderReturnsPage(); renderDashboard(); showToast("Return deleted.","success"); }); break;
+
+    case "add-settlement": openSettlementModal(); break;
+    case "edit-settlement": openSettlementModal(getById("settlements",id)); break;
+    case "delete-settlement": confirmAction("Delete this settlement? This cannot be undone.", ()=>{ deleteRecord("settlements",id); renderSettlementsPage(); renderDashboard(); showToast("Settlement deleted.","success"); }); break;
+    case "quick-settle": {
+      const c = computeSellerCod(id);
+      openSettlementModal(null, {sellerId:id, codCollected:c.outstanding, serviceCharges:Number(state.settings.defaultServiceCharge)||0});
+      break;
+    }
+
+    case "add-expense": openExpenseModal(); break;
+    case "edit-expense": openExpenseModal(getById("expenses",id)); break;
+    case "delete-expense": confirmAction("Delete this expense? This cannot be undone.", ()=>{ deleteRecord("expenses",id); renderExpensesPage(); renderDashboard(); showToast("Expense deleted.","success"); }); break;
+
+    case "export-csv": exportCsv(t.getAttribute("data-collection")); break;
+  }
+}
+function handleGlobalChange(e){
+  const t = e.target.closest("[data-action]");
+  if(!t) return;
+  const action = t.getAttribute("data-action");
+  const id = t.getAttribute("data-id");
+  if(action==="change-order-status") changeOrderStatus(id, t.value);
+  else if(action==="change-shipment-status") changeShipmentStatus(id, t.value);
+}
+
+/* ============================================================
+   SECTION 21: INIT / BIND / DARK MODE
+============================================================ */
+function cacheElements(){
+  els = {
+    sidebar: document.getElementById("sidebar"),
+    pageTitle: document.getElementById("pageTitle"),
+    pageSubtitle: document.getElementById("pageSubtitle"),
+    headerClock: document.getElementById("headerClock"),
+    loadingOverlay: document.getElementById("loadingOverlay"),
+    toastContainer: document.getElementById("toastContainer"),
+    confirmModal: document.getElementById("confirmModal"),
+    confirmMessage: document.getElementById("confirmMessage"),
+    confirmCancelBtn: document.getElementById("confirmCancelBtn"),
+    confirmOkBtn: document.getElementById("confirmOkBtn"),
+    modalOverlay: document.getElementById("modalOverlay"),
+    modalTitle: document.getElementById("modalTitle"),
+    modalFieldsContainer: document.getElementById("modalFieldsContainer"),
+    modalForm: document.getElementById("modalForm"),
+    modalCloseBtn: document.getElementById("modalCloseBtn"),
+    modalCancelBtn: document.getElementById("modalCancelBtn"),
+    syncDot: document.getElementById("syncDot"),
+    syncLabel: document.getElementById("syncLabel"),
+    darkModeToggle: document.getElementById("darkModeToggle"),
+    mobileNavToggle: document.getElementById("mobileNavToggle"),
+
+    dashStatGrid: document.getElementById("dashStatGrid"),
+    dashRecentOrders: document.getElementById("dashRecentOrders"),
+    dashLowStock: document.getElementById("dashLowStock"),
+
+    sellerSearch: document.getElementById("sellerSearch"),
+    sellersTbody: document.getElementById("sellersTbody"),
+
+    productSearch: document.getElementById("productSearch"),
+    productSellerFilter: document.getElementById("productSellerFilter"),
+    productsTbody: document.getElementById("productsTbody"),
+
+    inventorySearch: document.getElementById("inventorySearch"),
+    lowStockOnlyToggle: document.getElementById("lowStockOnlyToggle"),
+    inventoryTbody: document.getElementById("inventoryTbody"),
+    inventoryLogTbody: document.getElementById("inventoryLogTbody"),
+
+    orderSearch: document.getElementById("orderSearch"),
+    orderStatusFilter: document.getElementById("orderStatusFilter"),
+    orderSellerFilter: document.getElementById("orderSellerFilter"),
+    ordersTbody: document.getElementById("ordersTbody"),
+
+    shipmentSearch: document.getElementById("shipmentSearch"),
+    shipmentCourierFilter: document.getElementById("shipmentCourierFilter"),
+    shipmentsTbody: document.getElementById("shipmentsTbody"),
+
+    returnSearch: document.getElementById("returnSearch"),
+    returnsTbody: document.getElementById("returnsTbody"),
+
+    outstandingTbody: document.getElementById("outstandingTbody"),
+    settlementSellerFilter: document.getElementById("settlementSellerFilter"),
+    settlementPaidFilter: document.getElementById("settlementPaidFilter"),
+    settlementsTbody: document.getElementById("settlementsTbody"),
+
+    expenseSearch: document.getElementById("expenseSearch"),
+    expenseCategoryFilter: document.getElementById("expenseCategoryFilter"),
+    expensesTbody: document.getElementById("expensesTbody"),
+
+    reportFrom: document.getElementById("reportFrom"),
+    reportTo: document.getElementById("reportTo"),
+    reportRunBtn: document.getElementById("reportRunBtn"),
+    reportThisMonthBtn: document.getElementById("reportThisMonthBtn"),
+    reportStatGrid: document.getElementById("reportStatGrid"),
+    reportSellerTbody: document.getElementById("reportSellerTbody"),
+
+    settingsForm: document.getElementById("settingsForm"),
+    setCompanyName: document.getElementById("setCompanyName"),
+    setCompanyPhone: document.getElementById("setCompanyPhone"),
+    setCompanyAddress: document.getElementById("setCompanyAddress"),
+    setDefaultServiceCharge: document.getElementById("setDefaultServiceCharge"),
+    setDefaultLowStock: document.getElementById("setDefaultLowStock"),
+    resetAllBtn: document.getElementById("resetAllBtn")
+  };
+}
+function applyInitialDarkMode(){
+  try{
+    const pref = localStorage.getItem("valtrix.darkMode");
+    if(pref==="1") document.documentElement.classList.add("dark");
+  }catch(e){}
+}
+function toggleDarkMode(){
+  document.documentElement.classList.toggle("dark");
+  try{ localStorage.setItem("valtrix.darkMode", document.documentElement.classList.contains("dark") ? "1":"0"); }catch(e){}
+  if(ui.activePage==="dashboard") renderDashboard();
+}
+function updateHeaderClock(){
+  const d = new Date();
+  els.headerClock.textContent = d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+function bindEvents(){
+  document.addEventListener("click", handleGlobalClick);
+  document.addEventListener("change", handleGlobalChange);
+
+  els.modalCloseBtn.addEventListener("click", closeModal);
+  els.modalCancelBtn.addEventListener("click", closeModal);
+  els.modalOverlay.addEventListener("click", (e)=>{ if(e.target===els.modalOverlay) closeModal(); });
+
+  els.confirmCancelBtn.addEventListener("click", closeConfirmModal);
+  els.confirmOkBtn.addEventListener("click", ()=>{ const cb = confirmCallback; closeConfirmModal(); if(cb) cb(); });
+
+  els.darkModeToggle.addEventListener("click", toggleDarkMode);
+  els.mobileNavToggle.addEventListener("click", ()=> els.sidebar.classList.toggle("open"));
+
+  els.sellerSearch.addEventListener("input", renderSellersPage);
+  els.productSearch.addEventListener("input", renderProductsPage);
+  els.productSellerFilter.addEventListener("change", renderProductsPage);
+  els.inventorySearch.addEventListener("input", renderInventoryPage);
+  els.lowStockOnlyToggle.addEventListener("change", renderInventoryPage);
+  els.orderSearch.addEventListener("input", renderOrdersPage);
+  els.orderStatusFilter.addEventListener("change", renderOrdersPage);
+  els.orderSellerFilter.addEventListener("change", renderOrdersPage);
+  els.shipmentSearch.addEventListener("input", renderShipmentsPage);
+  els.shipmentCourierFilter.addEventListener("change", renderShipmentsPage);
+  els.returnSearch.addEventListener("input", renderReturnsPage);
+  els.settlementSellerFilter.addEventListener("change", renderSettlementsPage);
+  els.settlementPaidFilter.addEventListener("change", renderSettlementsPage);
+  els.expenseSearch.addEventListener("input", renderExpensesPage);
+  els.expenseCategoryFilter.addEventListener("change", renderExpensesPage);
+
+  els.reportRunBtn.addEventListener("click", runReport);
+  els.reportThisMonthBtn.addEventListener("click", ()=>{
+    const d = new Date();
+    const first = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01";
+    els.reportFrom.value = first; els.reportTo.value = todayKey();
+    runReport();
+  });
+
+  els.settingsForm.addEventListener("submit", (e)=>{
+    e.preventDefault();
+    state.settings.companyName = els.setCompanyName.value;
+    state.settings.companyPhone = els.setCompanyPhone.value;
+    state.settings.companyAddress = els.setCompanyAddress.value;
+    state.settings.defaultServiceCharge = Number(els.setDefaultServiceCharge.value)||0;
+    state.settings.defaultLowStock = Number(els.setDefaultLowStock.value)||0;
+    saveState();
+    showToast("Settings saved.","success");
+  });
+  els.resetAllBtn.addEventListener("click", ()=>{
+    confirmAction("This will permanently delete ALL sellers, products, orders, shipments, returns, settlements and expenses on this shared account. Continue?", ()=>{
+      const wipeTs = Date.now();
+      const wipeTombstones = buildFullWipeTombstones(state, wipeTs);
+      const carried = mergeTombstones(wipeTombstones, state.tombstones);
+      state = defaultState();
+      state.tombstones = carried;
+      saveState();
+      renderAllPages();
+      showToast("All data has been reset.","success");
+    });
+  });
+}
+function loadSettingsIntoForm(){
+  els.setCompanyName.value = state.settings.companyName || "";
+  els.setCompanyPhone.value = state.settings.companyPhone || "";
+  els.setCompanyAddress.value = state.settings.companyAddress || "";
+  els.setDefaultServiceCharge.value = state.settings.defaultServiceCharge || 0;
+  els.setDefaultLowStock.value = state.settings.defaultLowStock || 5;
+}
+async function init(){
+  cacheElements();
+  applyInitialDarkMode();
+  try{ state = await loadState(); }
+  catch(err){ console.warn("Valtrix WMS: unexpected error loading state, starting with local cache.", err); state = loadLocalCache(); }
+  sanitizeState();
+  bindEvents();
+  loadSettingsIntoForm();
+  renderAllPages();
+  updateHeaderClock();
+  updateSyncIndicator();
+  try{ subscribeToCloudUpdates(); }catch(err){ console.warn("Valtrix WMS: could not start live sync.", err); }
+  setInterval(updateHeaderClock, 1000);
+  setTimeout(()=>{ els.loadingOverlay.classList.add("hide"); }, 450);
+}
+document.addEventListener("DOMContentLoaded", ()=>{
+  init().catch(err=>{
+    console.warn("Valtrix WMS: fatal init error, forcing UI visible.", err);
+    const overlay = document.getElementById("loadingOverlay");
+    if(overlay) overlay.classList.add("hide");
+  });
+});
+})();
+</script>
+</body>
+</html>
