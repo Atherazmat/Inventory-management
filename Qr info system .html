@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+<title>Valtrix Product QR System</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%B7%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg:#f7f7f4;
+  --surface:#ffffff;
+  --surface-2:#f0efe9;
+  --border:#e1e0d8;
+  --ink:#1a2130;
+  --ink-soft:#5b6474;
+  --accent:#a8551f;
+  --accent-2:#1f4a52;
+  --accent-soft:rgba(168,85,31,.12);
+  --success:#25714f; --success-bg:rgba(37,113,79,.12);
+  --danger:#a5332a; --danger-bg:rgba(165,51,42,.12);
+  --warn:#8a6a1d; --warn-bg:rgba(138,106,29,.14);
+  --radius-lg:16px; --radius-md:11px; --radius-sm:8px;
+  --shadow:0 8px 24px rgba(20,25,35,.08);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+html.dark{
+  --bg:#10141b; --surface:#171d27; --surface-2:#1d2430; --border:#2a3240;
+  --ink:#eef1f6; --ink-soft:#9aa6b8;
+  --accent:#e0854a; --accent-2:#5fb8c2;
+  --accent-soft:rgba(224,133,74,.15);
+}
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{ margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink); min-height:100vh; -webkit-tap-highlight-color:transparent; }
+h1,h2,h3,p{ margin:0; }
+button{ font-family:inherit; cursor:pointer; }
+input,select,button,textarea{ font-size:.95rem; font-family:inherit; color:var(--ink); }
+img{ max-width:100%; display:block; }
+a{ color:var(--accent); }
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-thumb{ background:rgba(100,116,139,.35); border-radius:10px; }
+.hidden{ display:none !important; }
+
+/* loading */
+#loadingOverlay{ position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:var(--bg); transition:opacity .35s ease,visibility .35s ease; }
+#loadingOverlay.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+.spinner{ width:40px; height:40px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); animation:spin .8s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.loading-text{ font-weight:600; color:var(--ink-soft); font-size:.85rem; }
+
+/* header */
+.topbar{ position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:12px; justify-content:space-between; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border); }
+.brand{ display:flex; align-items:center; gap:9px; min-width:0; }
+.brand-mark{ width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.05rem; }
+.brand-text{ min-width:0; }
+.brand-text h1{ font-size:.95rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.brand-text p{ font-size:.66rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.05em; }
+.topbar-actions{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.sync-pill{ display:flex; align-items:center; gap:6px; font-size:.68rem; color:var(--ink-soft); padding:5px 9px; border-radius:999px; background:var(--surface-2); }
+.sync-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); }
+.sync-dot.syncing{ background:var(--warn); animation:pulse 1s ease-in-out infinite; }
+.sync-dot.offline{ background:var(--danger); }
+@keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+.icon-btn{ background:transparent; border:1px solid var(--border); width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--ink); font-size:.95rem; }
+.icon-btn:hover{ background:var(--surface-2); }
+
+/* nav tabs (desktop) */
+.tabnav{ display:flex; gap:4px; padding:0 16px; background:var(--surface); border-bottom:1px solid var(--border); overflow-x:auto; }
+.tabnav button{ border:none; background:transparent; padding:12px 14px; font-weight:700; font-size:.82rem; color:var(--ink-soft); border-bottom:2px solid transparent; white-space:nowrap; }
+.tabnav button.active{ color:var(--accent); border-bottom-color:var(--accent); }
+
+.content{ max-width:1100px; margin:0 auto; padding:18px 16px 90px; }
+
+/* bottom nav (mobile) */
+.bottomnav{ position:fixed; left:0; right:0; bottom:0; z-index:40; display:none; background:var(--surface); border-top:1px solid var(--border); padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px)); }
+.bottomnav-inner{ display:flex; }
+.bottomnav button{ flex:1; border:none; background:transparent; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px; font-size:.65rem; font-weight:700; color:var(--ink-soft); border-radius:9px; }
+.bottomnav button.active{ color:var(--accent); }
+.bottomnav .nicon{ font-size:1.15rem; }
+@media (max-width:720px){
+  .tabnav{ display:none; }
+  .bottomnav{ display:block; }
+  .content{ padding-bottom:96px; }
+}
+
+/* cards / layout */
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
+.page-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.page-head h2{ font-size:1.1rem; font-weight:800; }
+.page-head p{ font-size:.78rem; color:var(--ink-soft); margin-top:2px; }
+.toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+.toolbar input[type="text"],.toolbar input[type="search"]{ flex:1; min-width:160px; }
+
+.btn{ border:none; border-radius:var(--radius-sm); padding:10px 16px; font-weight:700; font-size:.83rem; transition:transform .12s ease,opacity .12s ease; }
+.btn:active{ transform:scale(.97); }
+.btn-primary{ background:var(--accent); color:#fff; }
+.btn-outline{ background:transparent; border:1px solid var(--border); color:var(--ink); }
+.btn-outline:hover{ background:var(--surface-2); }
+.btn-danger{ background:transparent; border:1px solid rgba(165,51,42,.4); color:var(--danger); }
+.btn-danger:hover{ background:var(--danger-bg); }
+.btn-block{ width:100%; }
+.btn-sm{ padding:7px 11px; font-size:.74rem; }
+
+input[type="text"],input[type="number"],input[type="password"],input[type="search"],select,textarea{
+  background:var(--surface); border:1px solid var(--border); color:var(--ink); padding:10px 12px; border-radius:var(--radius-sm); outline:none; width:100%;
+}
+textarea{ resize:vertical; font-family:inherit; min-height:70px; }
+input:focus,select:focus,textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.field{ display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+.field label{ font-size:.74rem; font-weight:700; color:var(--ink-soft); }
+.form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:560px){ .form-grid{ grid-template-columns:1fr; } }
+
+/* product list */
+.product-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+.product-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:13px; display:flex; flex-direction:column; gap:8px; }
+.product-thumb{ width:100%; aspect-ratio:4/3; border-radius:9px; background:var(--surface-2); overflow:hidden; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:1.6rem; }
+.product-thumb img{ width:100%; height:100%; object-fit:cover; }
+.product-card h3{ font-size:.92rem; font-weight:800; line-height:1.25; }
+.sku-pill{ display:inline-block; font-family:var(--mono); font-size:.68rem; background:var(--surface-2); padding:2px 7px; border-radius:6px; color:var(--ink-soft); width:fit-content; }
+.price-row{ display:flex; align-items:baseline; justify-content:space-between; }
+.price{ font-weight:800; font-size:1.02rem; }
+.tag{ font-size:.68rem; color:var(--ink-soft); }
+.card-actions{ display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; }
+.card-actions .btn{ flex:1; min-width:70px; }
+.empty-state{ text-align:center; padding:40px 16px; color:var(--ink-soft); }
+.empty-state .e-icon{ font-size:2.2rem; margin-bottom:8px; }
+
+/* login */
+.login-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.login-card{ width:100%; max-width:380px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:26px 22px; }
+.login-logo{ width:52px; height:52px; border-radius:14px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin:0 auto 14px; }
+.login-card h2{ text-align:center; font-size:1.15rem; font-weight:800; }
+.login-card p.sub{ text-align:center; font-size:.78rem; color:var(--ink-soft); margin-top:4px; margin-bottom:18px; }
+.role-toggle{ display:flex; background:var(--surface-2); border-radius:999px; padding:3px; margin-bottom:18px; }
+.role-toggle button{ flex:1; border:none; background:transparent; padding:8px; border-radius:999px; font-weight:700; font-size:.8rem; color:var(--ink-soft); }
+.role-toggle button.active{ background:var(--surface); color:var(--accent); box-shadow:0 2px 6px rgba(0,0,0,.08); }
+.login-err{ background:var(--danger-bg); color:var(--danger); font-size:.78rem; padding:8px 10px; border-radius:8px; margin-bottom:12px; display:none; }
+.login-hint{ font-size:.7rem; color:var(--ink-soft); text-align:center; margin-top:12px; }
+
+/* modal */
+.modal-overlay{ position:fixed; inset:0; background:rgba(15,20,28,.55); z-index:200; display:flex; align-items:flex-end; justify-content:center; padding:0; }
+.modal-overlay.hidden{ display:none; }
+.modal{ background:var(--surface); width:100%; max-width:560px; max-height:92vh; overflow-y:auto; border-radius:18px 18px 0 0; padding:18px; }
+@media (min-width:620px){ .modal-overlay{ align-items:center; } .modal{ border-radius:var(--radius-lg); margin-bottom:0; } }
+.modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.modal-head h3{ font-size:1.02rem; font-weight:800; }
+.modal-close{ background:transparent; border:none; font-size:1.2rem; color:var(--ink-soft); padding:4px 8px; }
+.modal-foot{ display:flex; gap:8px; margin-top:16px; }
+.modal-foot .btn{ flex:1; }
+.img-drop{ border:1.5px dashed var(--border); border-radius:var(--radius-md); padding:14px; text-align:center; color:var(--ink-soft); font-size:.8rem; cursor:pointer; }
+.img-preview{ width:100%; max-height:160px; object-fit:contain; border-radius:9px; margin-bottom:8px; background:var(--surface-2); }
+
+/* qr modal */
+.qr-box{ display:flex; flex-direction:column; align-items:center; gap:12px; }
+#qrCanvasWrap{ background:#fff; padding:14px; border-radius:12px; }
+.qr-link{ width:100%; font-family:var(--mono); font-size:.72rem; background:var(--surface-2); padding:10px; border-radius:8px; word-break:break-all; }
+
+/* scanner */
+#scannerRegion{ width:100%; border-radius:12px; overflow:hidden; background:#000; min-height:260px; }
+.scan-hint{ font-size:.78rem; color:var(--ink-soft); text-align:center; margin-top:10px; }
+
+/* product detail (public) */
+.detail-wrap{ max-width:560px; margin:0 auto; padding:18px 16px 40px; }
+.detail-hero{ width:100%; aspect-ratio:4/3; border-radius:var(--radius-lg); background:var(--surface-2); overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:3rem; color:var(--ink-soft); margin-bottom:16px; }
+.detail-hero img{ width:100%; height:100%; object-fit:cover; }
+.detail-title{ font-size:1.35rem; font-weight:800; line-height:1.25; }
+.detail-brandmodel{ color:var(--ink-soft); font-size:.85rem; margin-top:3px; }
+.detail-price-row{ display:flex; align-items:baseline; gap:10px; margin:14px 0; }
+.detail-price{ font-size:1.7rem; font-weight:800; color:var(--accent); }
+.detail-discount{ font-size:.8rem; font-weight:700; color:var(--success); background:var(--success-bg); padding:3px 9px; border-radius:999px; }
+.spec-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0; }
+.spec-box{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:11px 12px; }
+.spec-box .k{ font-size:.66rem; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); font-weight:700; }
+.spec-box .v{ font-size:.9rem; font-weight:700; margin-top:3px; }
+.detail-section{ margin-top:16px; }
+.detail-section h4{ font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); font-weight:700; margin-bottom:6px; }
+.detail-section p{ font-size:.9rem; line-height:1.55; }
+.parts-list{ display:flex; flex-wrap:wrap; gap:6px; }
+.parts-list span{ background:var(--surface-2); border-radius:999px; padding:5px 11px; font-size:.78rem; }
+.notfound{ text-align:center; padding:60px 20px; }
+
+/* toast */
+#toastHost{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:500; display:flex; flex-direction:column; gap:8px; align-items:center; width:calc(100% - 32px); max-width:420px; }
+.toast{ background:var(--ink); color:#fff; padding:11px 16px; border-radius:10px; font-size:.82rem; box-shadow:var(--shadow); animation:toastIn .25s ease; }
+.toast.success{ background:var(--success); } .toast.error{ background:var(--danger); }
+@keyframes toastIn{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:translateY(0);} }
+
+.confirm-box{ text-align:center; }
+.confirm-box p{ font-size:.9rem; margin:14px 0 4px; }
+.badge-role{ font-size:.66rem; font-weight:800; padding:3px 9px; border-radius:999px; background:var(--accent-soft); color:var(--accent); text-transform:uppercase; letter-spacing:.03em; }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay"><div class="spinner"></div><div class="loading-text">Loading…</div></div>
+
+<div id="toastHost"></div>
+
+<!-- ===================== PUBLIC PRODUCT DETAIL VIEW ===================== -->
+<div id="productDetailView" class="hidden">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">🏷️</div>
+      <div class="brand-text"><h1 id="pdStoreName">Store</h1><p>Product info</p></div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="pdAppLink" title="Open app">☰</button>
+    </div>
+  </div>
+  <div id="productDetailBody" class="detail-wrap"></div>
+</div>
+
+<!-- ===================== LOGIN VIEW ===================== -->
+<div id="loginView" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">🏷️</div>
+      <h2 id="loginStoreName">Product QR System</h2>
+      <p class="sub">Sign in to continue</p>
+      <div class="role-toggle">
+        <button type="button" id="roleAdminBtn" class="active">Admin</button>
+        <button type="button" id="roleSalesBtn">Salesman</button>
+      </div>
+      <div id="loginErr" class="login-err"></div>
+      <form id="loginForm">
+        <div class="field"><label>Username</label><input type="text" id="loginUsername" autocomplete="username" required /></div>
+        <div class="field"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password" required /></div>
+        <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+      </form>
+      <p class="login-hint" id="loginHint">Default admin login: admin / admin123 — change it after signing in.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MAIN APP SHELL ===================== -->
+<div id="appShell" class="hidden">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">🏷️</div>
+      <div class="brand-text"><h1 id="appStoreName">Store</h1><p id="appRoleLabel">Admin</p></div>
+    </div>
+    <div class="topbar-actions">
+      <span class="sync-pill"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Synced</span></span>
+      <button class="icon-btn" id="darkModeToggle" title="Toggle theme">🌙</button>
+      <button class="icon-btn" id="logoutBtn" title="Log out">⏻</button>
+    </div>
+  </div>
+
+  <div class="tabnav" id="tabnavDesktop"></div>
+
+  <div class="content">
+    <!-- ADMIN: PRODUCTS -->
+    <div id="page-products" class="page hidden">
+      <div class="page-head">
+        <div><h2>Products</h2><p id="productCount"></p></div>
+        <button class="btn btn-primary" id="addProductBtn">+ Add product</button>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="productSearch" placeholder="Search by name, SKU, brand, category…" />
+      </div>
+      <div id="productGrid" class="product-grid"></div>
+    </div>
+
+    <!-- ADMIN: SALESMEN -->
+    <div id="page-salesmen" class="page hidden">
+      <div class="page-head">
+        <div><h2>Salesman accounts</h2><p>Manage who can search and view products on the floor.</p></div>
+        <button class="btn btn-primary" id="addSalesmanBtn">+ Add salesman</button>
+      </div>
+      <div id="salesmenList"></div>
+    </div>
+
+    <!-- ADMIN: SETTINGS -->
+    <div id="page-settings" class="page hidden">
+      <div class="page-head"><div><h2>Settings</h2><p>Store name and admin credentials.</p></div></div>
+      <div class="card">
+        <form id="settingsForm">
+          <div class="field"><label>Store name</label><input type="text" id="setStoreName" /></div>
+          <div class="form-grid">
+            <div class="field"><label>Admin username</label><input type="text" id="setAdminUsername" /></div>
+            <div class="field"><label>Admin password</label><input type="text" id="setAdminPassword" /></div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save settings</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- SALESMAN: SEARCH -->
+    <div id="page-search" class="page hidden">
+      <div class="page-head">
+        <div><h2>Products</h2><p id="salesProductCount"></p></div>
+        <button class="btn btn-primary" id="scanBtn">📷 Scan QR</button>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="salesProductSearch" placeholder="Search by name, SKU, brand, category…" />
+      </div>
+      <div id="salesProductGrid" class="product-grid"></div>
+    </div>
+  </div>
+
+  <div class="bottomnav">
+    <div class="bottomnav-inner" id="bottomnavInner"></div>
+  </div>
+</div>
+
+<!-- ===================== PRODUCT FORM MODAL ===================== -->
+<div id="productModalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head"><h3 id="productModalTitle">Add product</h3><button class="modal-close" id="productModalClose">✕</button></div>
+    <form id="productForm">
+      <input type="hidden" id="pfId" />
+      <div class="field">
+        <label>Product image (optional)</label>
+        <img id="pfImgPreview" class="img-preview hidden" />
+        <div class="img-drop" id="pfImgDrop">Tap to choose an image</div>
+        <input type="file" id="pfImgInput" accept="image/*" class="hidden" />
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Product ID / SKU *</label><input type="text" id="pfSku" required /></div>
+        <div class="field"><label>Product name *</label><input type="text" id="pfName" required /></div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Price *</label><input type="number" step="0.01" id="pfPrice" required /></div>
+        <div class="field"><label>Maximum discount (%)</label><input type="number" step="0.01" id="pfMaxDiscount" /></div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Dimensions</label><input type="text" id="pfDimensions" placeholder="e.g. 120 x 60 x 75 cm" /></div>
+        <div class="field"><label>Unit</label><input type="text" id="pfUnit" placeholder="e.g. piece, box, set" /></div>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Category</label><input type="text" id="pfCategory" /></div>
+        <div class="field"><label>Brand</label><input type="text" id="pfBrand" /></div>
+      </div>
+      <div class="field"><label>Model</label><input type="text" id="pfModel" /></div>
+      <div class="field"><label>Parts / included components</label><textarea id="pfParts" placeholder="Comma-separated, e.g. Remote, Power cable, Manual"></textarea></div>
+      <div class="field"><label>Description</label><textarea id="pfDescription"></textarea></div>
+      <div class="field"><label>Notes</label><textarea id="pfNotes"></textarea></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-outline" id="productModalCancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== QR MODAL ===================== -->
+<div id="qrModalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head"><h3>Product QR code</h3><button class="modal-close" id="qrModalClose">✕</button></div>
+    <div class="qr-box">
+      <div id="qrCanvasWrap"></div>
+      <div id="qrLink" class="qr-link"></div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="qrCopyBtn">Copy link</button>
+        <button class="btn btn-primary" id="qrDownloadBtn">Download PNG</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SALESMAN FORM MODAL ===================== -->
+<div id="salesmanModalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head"><h3 id="salesmanModalTitle">Add salesman</h3><button class="modal-close" id="salesmanModalClose">✕</button></div>
+    <form id="salesmanForm">
+      <input type="hidden" id="smId" />
+      <div class="field"><label>Full name *</label><input type="text" id="smName" required /></div>
+      <div class="field"><label>Username *</label><input type="text" id="smUsername" required /></div>
+      <div class="field"><label>Password *</label><input type="text" id="smPassword" required /></div>
+      <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="smActive" style="width:auto;" checked /><label style="margin:0;">Active</label>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-outline" id="salesmanModalCancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save salesman</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== SCANNER MODAL ===================== -->
+<div id="scannerModalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-head"><h3>Scan product QR</h3><button class="modal-close" id="scannerModalClose">✕</button></div>
+    <div id="scannerRegion"></div>
+    <p class="scan-hint">Point the camera at a product's QR code.</p>
+  </div>
+</div>
+
+<!-- ===================== CONFIRM MODAL ===================== -->
+<div id="confirmModalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="confirm-box">
+      <div style="font-size:1.8rem;">⚠️</div>
+      <p id="confirmText"></p>
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="confirmCancelBtn">Cancel</button>
+        <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   SECTION 1: CONSTANTS + CLOUD CLIENT
+   (Sync architecture adapted from the original Valtrix WMS:
+   Supabase "app_state" row holds the whole shared JSON blob,
+   localStorage caches it for offline/instant load, changes are
+   merged by id with tombstones so no device silently loses data,
+   and a lightweight poll + realtime subscription keep every
+   device in sync without hammering the network.)
+============================================================ */
+const STORAGE_KEY = "valtrix_pqis_state_v1";
+const SESSION_KEY = "valtrix_pqis_session_v1";
+const SUPABASE_URL = "https://vpujtqytmcfczykiyjga.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdWp0cXl0bWNmY3p5a2l5amdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MDk2MjEsImV4cCI6MjEwMjE4NTYyMX0.k34ESvgPOEqBdFGRhx4wVajqSkHFwfjZ-wAEVVC9_GE";
+const CLOUD_ROW_ID = "product_qr_main";
+
+let cloud = null;
+try{
+  if(window.supabase && typeof window.supabase.createClient === "function"){
+    cloud = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }else{ console.warn("PQIS: Supabase library did not load — running in local-only mode."); }
+}catch(err){ console.warn("PQIS: could not initialize cloud client — running local-only.", err); }
+
+let cloudSaveTimer = null;
+const pendingEchoTimestamps = new Set();
+let pushChain = Promise.resolve();
+let lastPushFailed = false;
+let lastKnownRemoteUpdatedAt = null;
+let pollTimer = null;
+let pollInFlight = false;
+let isCloudSaving = false;
+const POLL_INTERVAL_MS = 5000;
+let pollBackoffMs = POLL_INTERVAL_MS;
+const POLL_BACKOFF_MAX_MS = 60000;
+
+const COLLECTIONS = ["products","salesmen"];
+
+let state = null;
+let els = {};
+let session = null; // {role:"admin"|"salesman", username, name}
+const ui = { activePage:null };
+let scannerInstance = null;
+
+/* ============================================================
+   SECTION 2: STATE / PERSISTENCE / MERGE
+============================================================ */
+function defaultTombstones(){ const t={}; COLLECTIONS.forEach(c=>t[c]={}); return t; }
+function normalizeTombstones(parsed){
+  const t = (parsed && typeof parsed==="object") ? parsed : {};
+  const out = {};
+  COLLECTIONS.forEach(c=>{ out[c] = (t[c] && typeof t[c]==="object") ? t[c] : {}; });
+  return out;
+}
+function defaultState(){
+  return {
+    settings: { storeName:"Valtrix Store", adminUsername:"admin", adminPassword:"admin123" },
+    products: [],
+    salesmen: [],
+    tombstones: defaultTombstones()
+  };
+}
+function normalizeState(parsed){
+  if(!parsed || typeof parsed !== "object") return defaultState();
+  const d = defaultState();
+  const out = {
+    settings: { ...d.settings, ...(parsed.settings && typeof parsed.settings==="object" ? parsed.settings : {}) },
+    tombstones: normalizeTombstones(parsed.tombstones)
+  };
+  COLLECTIONS.forEach(c=>{ out[c] = Array.isArray(parsed[c]) ? parsed[c] : []; });
+  return out;
+}
+function mergeArraysById(remoteArr, localArr){
+  remoteArr = Array.isArray(remoteArr) ? remoteArr : [];
+  localArr = Array.isArray(localArr) ? localArr : [];
+  const map = new Map();
+  remoteArr.forEach(item=>{ if(item && item.id != null) map.set(item.id, item); });
+  localArr.forEach(item=>{
+    if(!item || item.id == null) return;
+    const existing = map.get(item.id);
+    if(!existing){ map.set(item.id, item); return; }
+    const existingTs = Date.parse(existing.updatedAt||0)||0;
+    const localTs = Date.parse(item.updatedAt||0)||0;
+    map.set(item.id, localTs >= existingTs ? item : existing);
+  });
+  return Array.from(map.values());
+}
+function mergeTombstoneMap(remoteMap, localMap){
+  remoteMap = (remoteMap && typeof remoteMap==="object") ? remoteMap : {};
+  localMap = (localMap && typeof localMap==="object") ? localMap : {};
+  const out = { ...remoteMap };
+  Object.keys(localMap).forEach(k=>{ out[k] = Math.max(Number(remoteMap[k])||0, Number(localMap[k])||0); });
+  return out;
+}
+function mergeTombstones(remoteT, localT){
+  remoteT = normalizeTombstones(remoteT); localT = normalizeTombstones(localT);
+  const out = {};
+  COLLECTIONS.forEach(c=>{ out[c] = mergeTombstoneMap(remoteT[c], localT[c]); });
+  return out;
+}
+function pruneTombstonedById(arr, tombMap){
+  if(!Array.isArray(arr)) return [];
+  tombMap = tombMap || {};
+  return arr.filter(item=> !(item && item.id != null && tombMap[item.id] != null));
+}
+function mergeStates(remote, local){
+  remote = normalizeState(remote); local = normalizeState(local);
+  const tombstones = mergeTombstones(remote.tombstones, local.tombstones);
+  const out = { settings: { ...remote.settings, ...local.settings }, tombstones };
+  COLLECTIONS.forEach(c=>{ out[c] = pruneTombstonedById(mergeArraysById(remote[c], local[c]), tombstones[c]); });
+  return out;
+}
+function loadLocalCache(){
+  try{ const raw = localStorage.getItem(STORAGE_KEY); return raw ? normalizeState(JSON.parse(raw)) : defaultState(); }
+  catch(err){ return defaultState(); }
+}
+async function loadState(){
+  if(!cloud) return loadLocalCache();
+  try{
+    const { data, error } = await cloud.from("app_state").select("data").eq("id", CLOUD_ROW_ID).maybeSingle();
+    if(error) throw error;
+    if(!data){
+      const seed = loadLocalCache();
+      await cloud.from("app_state").upsert({ id: CLOUD_ROW_ID, data: seed, updated_at: new Date().toISOString() });
+      return seed;
+    }
+    const fresh = normalizeState(data.data);
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)); }catch(e){}
+    return fresh;
+  }catch(err){
+    console.warn("PQIS: could not reach cloud storage, using local cache.", err);
+    return loadLocalCache();
+  }
+}
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(err){ console.warn("PQIS: failed to save local cache.", err); }
+  if(cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(queuePushToCloud, 400);
+  updateSyncIndicator();
+}
+function queuePushToCloud(){ pushChain = pushChain.then(pushStateToCloud).catch(()=>{}); }
+async function pushStateToCloud(){
+  if(!cloud) return;
+  isCloudSaving = true; updateSyncIndicator();
+  try{
+    let toPush = state;
+    try{
+      const { data: latest, error: fetchErr } = await cloud.from("app_state").select("data").eq("id", CLOUD_ROW_ID).maybeSingle();
+      if(!fetchErr && latest && latest.data){
+        toPush = mergeStates(latest.data, state);
+        state = toPush;
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      }
+    }catch(fetchErr){ console.warn("PQIS: could not fetch latest cloud data before saving — pushing local copy as-is.", fetchErr); }
+    const stamp = new Date().toISOString();
+    pendingEchoTimestamps.add(stamp);
+    const { error } = await cloud.from("app_state").upsert({ id: CLOUD_ROW_ID, data: toPush, updated_at: stamp });
+    if(error) throw error;
+    lastPushFailed = false;
+  }catch(err){
+    lastPushFailed = true;
+    console.warn("PQIS: failed to sync to cloud.", err);
+    showToast("Could not sync to cloud — check your connection.", "error");
+  }finally{ isCloudSaving = false; updateSyncIndicator(); }
+}
+function subscribeToCloudUpdates(){
+  if(!cloud) return;
+  cloud.channel("app_state_sync_pqis").on(
+    "postgres_changes",
+    { event:"UPDATE", schema:"public", table:"app_state", filter:`id=eq.${CLOUD_ROW_ID}` },
+    (payload)=>{
+      const incomingStamp = payload.new && payload.new.updated_at;
+      if(incomingStamp && pendingEchoTimestamps.has(incomingStamp)){ pendingEchoTimestamps.delete(incomingStamp); return; }
+      const incoming = payload.new && payload.new.data;
+      if(!incoming) return;
+      state = mergeStates(incoming, state);
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      onStateUpdatedFromRemote();
+    }
+  ).subscribe();
+
+  window.addEventListener("online", ()=>{ if(cloud) queuePushToCloud(); });
+  setInterval(()=>{ if(cloud && lastPushFailed && navigator.onLine !== false) queuePushToCloud(); }, 20000);
+
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.hidden) stopPollTimer(); else schedulePoll(0);
+  });
+  if(!document.hidden) startPolling();
+}
+function stopPollTimer(){ if(pollTimer){ clearTimeout(pollTimer); pollTimer=null; } }
+function schedulePoll(delay){ stopPollTimer(); pollTimer = setTimeout(pollSharedStateOnce, delay); }
+function startPolling(){ if(pollTimer || pollInFlight) return; schedulePoll(POLL_INTERVAL_MS); }
+async function pollSharedStateOnce(){
+  pollTimer = null;
+  if(!cloud){ schedulePoll(POLL_INTERVAL_MS); return; }
+  if(pollInFlight) return;
+  if(document.hidden) return;
+  if(isCloudSaving){ schedulePoll(POLL_INTERVAL_MS); return; }
+  pollInFlight = true;
+  try{
+    const { data, error } = await cloud.from("app_state").select("updated_at").eq("id", CLOUD_ROW_ID).maybeSingle();
+    if(error) throw error;
+    const remoteStamp = data && data.updated_at;
+    if(!remoteStamp){ pollBackoffMs = POLL_INTERVAL_MS; return; }
+    if(lastKnownRemoteUpdatedAt === null){ lastKnownRemoteUpdatedAt = remoteStamp; pollBackoffMs = POLL_INTERVAL_MS; return; }
+    if(remoteStamp === lastKnownRemoteUpdatedAt){ pollBackoffMs = POLL_INTERVAL_MS; return; }
+    if(pendingEchoTimestamps.has(remoteStamp)){ pendingEchoTimestamps.delete(remoteStamp); lastKnownRemoteUpdatedAt = remoteStamp; pollBackoffMs = POLL_INTERVAL_MS; return; }
+
+    const { data: full, error: fullErr } = await cloud.from("app_state").select("data, updated_at").eq("id", CLOUD_ROW_ID).maybeSingle();
+    if(fullErr) throw fullErr;
+    if(!full || !full.data){ pollBackoffMs = POLL_INTERVAL_MS; return; }
+
+    state = mergeStates(full.data, state);
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    onStateUpdatedFromRemote();
+    lastKnownRemoteUpdatedAt = full.updated_at || remoteStamp;
+    pollBackoffMs = POLL_INTERVAL_MS;
+  }catch(err){
+    console.warn("PQIS: background poll failed.", err);
+    pollBackoffMs = Math.min(pollBackoffMs*2, POLL_BACKOFF_MAX_MS);
+  }finally{
+    pollInFlight = false;
+    if(!document.hidden) schedulePoll(pollBackoffMs);
+  }
+}
+function onStateUpdatedFromRemote(){
+  // Only re-render — never force a page reload/navigation.
+  if(document.getElementById("productDetailView") && !document.getElementById("productDetailView").classList.contains("hidden")){
+    renderProductDetailFromUrl();
+    return;
+  }
+  if(!session) return;
+  renderCurrentPage();
+  showToast("Updated with changes from another device.", "success");
+}
+function updateSyncIndicator(){
+  if(!els.syncDot) return;
+  els.syncDot.className = "sync-dot";
+  if(!cloud){ els.syncDot.classList.add("offline"); els.syncLabel.textContent = "Local only"; return; }
+  if(isCloudSaving){ els.syncDot.classList.add("syncing"); els.syncLabel.textContent = "Syncing…"; return; }
+  if(lastPushFailed){ els.syncDot.classList.add("offline"); els.syncLabel.textContent = "Sync failed"; return; }
+  els.syncLabel.textContent = "Synced";
+}
+
+/* ============================================================
+   SECTION 3: UTILITIES
+============================================================ */
+function generateId(prefix){ return (prefix||"id")+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8); }
+function nowIso(){ return new Date().toISOString(); }
+function escapeHtml(str){ return String(str==null?"":str).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function formatMoney(n){ n = Number(n)||0; return n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function getById(collection, id){ return (state[collection]||[]).find(x=>x.id===id) || null; }
+function findProductBySku(sku){
+  if(sku==null) return null;
+  const s = String(sku).trim().toLowerCase();
+  if(!s) return null;
+  return state.products.find(p=> (p.sku||"").trim().toLowerCase()===s || p.id===sku) || null;
+}
+function addRecord(collection, obj){
+  const now = nowIso();
+  obj.id = generateId(collection.slice(0,3));
+  obj.createdAt = now; obj.updatedAt = now;
+  state[collection].push(obj);
+  saveState();
+  return obj;
+}
+function updateRecord(collection, id, patch){
+  const item = getById(collection, id);
+  if(!item) return null;
+  Object.assign(item, patch);
+  item.updatedAt = nowIso();
+  saveState();
+  return item;
+}
+function deleteRecord(collection, id){
+  const idx = state[collection].findIndex(x=>x.id===id);
+  if(idx<0) return;
+  state[collection].splice(idx,1);
+  state.tombstones[collection][id] = Date.now();
+  saveState();
+}
+function productUrl(sku){
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.searchParams.set("id", sku);
+  return url.toString();
+}
+
+/* ============================================================
+   SECTION 4: TOASTS / CONFIRM
+============================================================ */
+function showToast(message, type){
+  const toast = document.createElement("div");
+  toast.className = "toast " + (type||"");
+  toast.textContent = message;
+  document.getElementById("toastHost").appendChild(toast);
+  setTimeout(()=>{ toast.remove(); }, 3200);
+}
+let confirmCallback = null;
+function confirmAction(text, cb){
+  document.getElementById("confirmText").textContent = text;
+  confirmCallback = cb;
+  document.getElementById("confirmModalOverlay").classList.remove("hidden");
+}
+function closeConfirmModal(){ document.getElementById("confirmModalOverlay").classList.add("hidden"); confirmCallback = null; }
+
+/* ============================================================
+   SECTION 5: AUTH
+============================================================ */
+function loadSession(){
+  try{ const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function saveSession(s){ try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }catch(e){} }
+function clearSession(){ try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
+function attemptLogin(role, username, password){
+  username = (username||"").trim();
+  if(role==="admin"){
+    if(username===state.settings.adminUsername && password===state.settings.adminPassword){
+      return { role:"admin", username, name:"Admin" };
+    }
+    return null;
+  }else{
+    const sm = state.salesmen.find(s=> (s.username||"").toLowerCase()===username.toLowerCase() && s.password===password);
+    if(sm && sm.active!==false) return { role:"salesman", username:sm.username, name:sm.name, salesmanId:sm.id };
+    return null;
+  }
+}
+
+/* ============================================================
+   SECTION 6: NAV / RENDER SHELL
+============================================================ */
+const NAV = {
+  admin: [
+    { id:"products", label:"Products", icon:"📦" },
+    { id:"salesmen", label:"Salesmen", icon:"👥" },
+    { id:"settings", label:"Settings", icon:"⚙️" }
+  ],
+  salesman: [
+    { id:"search", label:"Products", icon:"🔍" }
+  ]
+};
+function renderNav(){
+  const items = NAV[session.role];
+  els.tabnavDesktop.innerHTML = items.map(it=>
+    `<button data-page="${it.id}" class="${ui.activePage===it.id?'active':''}">${it.icon} ${it.label}</button>`
+  ).join("");
+  els.bottomnavInner.innerHTML = items.map(it=>
+    `<button data-page="${it.id}" class="${ui.activePage===it.id?'active':''}"><span class="nicon">${it.icon}</span>${it.label}</button>`
+  ).join("");
+  [...els.tabnavDesktop.querySelectorAll("button"), ...els.bottomnavInner.querySelectorAll("button")].forEach(btn=>{
+    btn.addEventListener("click", ()=> goToPage(btn.dataset.page));
+  });
+}
+function goToPage(pageId){
+  ui.activePage = pageId;
+  document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
+  const pageEl = document.getElementById("page-"+pageId);
+  if(pageEl) pageEl.classList.remove("hidden");
+  renderNav();
+  renderCurrentPage();
+}
+function renderCurrentPage(){
+  if(ui.activePage==="products") renderProductsPage();
+  else if(ui.activePage==="salesmen") renderSalesmenPage();
+  else if(ui.activePage==="settings") loadSettingsForm();
+  else if(ui.activePage==="search") renderSalesSearchPage();
+}
+
+/* ============================================================
+   SECTION 7: PRODUCTS (ADMIN)
+============================================================ */
+function productCardHtml(p, adminMode){
+  const img = p.image ? `<img src="${p.image}" alt="">` : `📦`;
+  const discount = p.maxDiscount ? `<span class="tag">up to ${escapeHtml(p.maxDiscount)}% off</span>` : "";
+  return `
+  <div class="product-card" data-id="${p.id}">
+    <div class="product-thumb">${img}</div>
+    <span class="sku-pill">${escapeHtml(p.sku||"")}</span>
+    <h3>${escapeHtml(p.name||"Untitled product")}</h3>
+    <div class="price-row"><span class="price">$${formatMoney(p.price)}</span>${discount}</div>
+    <span class="tag">${escapeHtml([p.brand,p.category].filter(Boolean).join(" · "))}</span>
+    <div class="card-actions">
+      ${adminMode ? `
+        <button class="btn btn-outline btn-sm" data-act="qr">QR</button>
+        <button class="btn btn-outline btn-sm" data-act="edit">Edit</button>
+        <button class="btn btn-danger btn-sm" data-act="delete">Delete</button>
+      ` : `
+        <button class="btn btn-primary btn-sm btn-block" data-act="view">View details</button>
+      `}
+    </div>
+  </div>`;
+}
+function filterProducts(list, q){
+  q = (q||"").trim().toLowerCase();
+  if(!q) return list;
+  return list.filter(p=>{
+    return [p.name,p.sku,p.brand,p.category,p.model].some(v=> (v||"").toLowerCase().includes(q));
+  });
+}
+function renderProductsPage(){
+  const q = els.productSearch.value;
+  const list = filterProducts(state.products, q).slice().sort((a,b)=> (a.name||"").localeCompare(b.name||""));
+  els.productCount.textContent = `${state.products.length} product${state.products.length===1?"":"s"} total`;
+  if(!list.length){
+    els.productGrid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">📦</div><p>${state.products.length? "No products match your search.":"No products yet. Add your first product to get started."}</p></div>`;
+    return;
+  }
+  els.productGrid.innerHTML = list.map(p=>productCardHtml(p,true)).join("");
+}
+function openProductModal(product){
+  const f = document.getElementById("productForm");
+  f.reset();
+  document.getElementById("pfImgPreview").classList.add("hidden");
+  document.getElementById("pfImgPreview").src = "";
+  f.dataset.image = "";
+  if(product){
+    document.getElementById("productModalTitle").textContent = "Edit product";
+    document.getElementById("pfId").value = product.id;
+    document.getElementById("pfSku").value = product.sku||"";
+    document.getElementById("pfName").value = product.name||"";
+    document.getElementById("pfPrice").value = product.price||"";
+    document.getElementById("pfMaxDiscount").value = product.maxDiscount||"";
+    document.getElementById("pfDimensions").value = product.dimensions||"";
+    document.getElementById("pfUnit").value = product.unit||"";
+    document.getElementById("pfCategory").value = product.category||"";
+    document.getElementById("pfBrand").value = product.brand||"";
+    document.getElementById("pfModel").value = product.model||"";
+    document.getElementById("pfParts").value = product.parts||"";
+    document.getElementById("pfDescription").value = product.description||"";
+    document.getElementById("pfNotes").value = product.notes||"";
+    if(product.image){
+      document.getElementById("pfImgPreview").src = product.image;
+      document.getElementById("pfImgPreview").classList.remove("hidden");
+      f.dataset.image = product.image;
+    }
+  }else{
+    document.getElementById("productModalTitle").textContent = "Add product";
+    document.getElementById("pfId").value = "";
+  }
+  document.getElementById("productModalOverlay").classList.remove("hidden");
+}
+function closeProductModal(){ document.getElementById("productModalOverlay").classList.add("hidden"); }
+function handleImageFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      const maxW = 640;
+      const scale = Math.min(1, maxW/img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width*scale);
+      canvas.height = Math.round(img.height*scale);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg",0.75);
+      document.getElementById("pfImgPreview").src = dataUrl;
+      document.getElementById("pfImgPreview").classList.remove("hidden");
+      document.getElementById("productForm").dataset.image = dataUrl;
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function submitProductForm(e){
+  e.preventDefault();
+  const id = document.getElementById("pfId").value;
+  const sku = document.getElementById("pfSku").value.trim();
+  if(!sku){ showToast("SKU is required.","error"); return; }
+  const dupe = state.products.find(p=> p.id!==id && (p.sku||"").toLowerCase()===sku.toLowerCase());
+  if(dupe){ showToast("Another product already uses this SKU.","error"); return; }
+  const payload = {
+    sku,
+    name: document.getElementById("pfName").value.trim(),
+    price: Number(document.getElementById("pfPrice").value)||0,
+    maxDiscount: Number(document.getElementById("pfMaxDiscount").value)||0,
+    dimensions: document.getElementById("pfDimensions").value.trim(),
+    unit: document.getElementById("pfUnit").value.trim(),
+    category: document.getElementById("pfCategory").value.trim(),
+    brand: document.getElementById("pfBrand").value.trim(),
+    model: document.getElementById("pfModel").value.trim(),
+    parts: document.getElementById("pfParts").value.trim(),
+    description: document.getElementById("pfDescription").value.trim(),
+    notes: document.getElementById("pfNotes").value.trim(),
+    image: document.getElementById("productForm").dataset.image || ""
+  };
+  if(id){ updateRecord("products", id, payload); showToast("Product updated.","success"); }
+  else{ addRecord("products", payload); showToast("Product added.","success"); }
+  closeProductModal();
+  renderProductsPage();
+}
+function openQrModal(product){
+  document.getElementById("qrCanvasWrap").innerHTML = "";
+  const link = productUrl(product.sku);
+  document.getElementById("qrLink").textContent = link;
+  new QRCode(document.getElementById("qrCanvasWrap"), { text: link, width:220, height:220, correctLevel: QRCode.CorrectLevel.M });
+  document.getElementById("qrModalOverlay").classList.remove("hidden");
+  document.getElementById("qrCopyBtn").onclick = async ()=>{
+    try{ await navigator.clipboard.writeText(link); showToast("Link copied.","success"); }
+    catch(e){ showToast("Could not copy — select and copy manually.","error"); }
+  };
+  document.getElementById("qrDownloadBtn").onclick = ()=>{
+    const canvas = document.querySelector("#qrCanvasWrap canvas");
+    if(!canvas) return;
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = `qr-${product.sku}.png`;
+    a.click();
+  };
+}
+function closeQrModal(){ document.getElementById("qrModalOverlay").classList.add("hidden"); }
+
+/* ============================================================
+   SECTION 8: SALESMEN (ADMIN)
+============================================================ */
+function renderSalesmenPage(){
+  const list = state.salesmen.slice().sort((a,b)=> (a.name||"").localeCompare(b.name||""));
+  if(!list.length){
+    els.salesmenList.innerHTML = `<div class="empty-state"><div class="e-icon">👥</div><p>No salesman accounts yet.</p></div>`;
+    return;
+  }
+  els.salesmenList.innerHTML = list.map(sm=>`
+    <div class="card" data-id="${sm.id}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:800;">${escapeHtml(sm.name)} ${sm.active===false?'<span class="tag" style="color:var(--danger);">(inactive)</span>':''}</div>
+        <div class="tag">@${escapeHtml(sm.username)}</div>
+      </div>
+      <div class="card-actions" style="margin:0;">
+        <button class="btn btn-outline btn-sm" data-act="edit">Edit</button>
+        <button class="btn btn-danger btn-sm" data-act="delete">Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+function openSalesmanModal(sm){
+  const f = document.getElementById("salesmanForm");
+  f.reset();
+  if(sm){
+    document.getElementById("salesmanModalTitle").textContent = "Edit salesman";
+    document.getElementById("smId").value = sm.id;
+    document.getElementById("smName").value = sm.name||"";
+    document.getElementById("smUsername").value = sm.username||"";
+    document.getElementById("smPassword").value = sm.password||"";
+    document.getElementById("smActive").checked = sm.active!==false;
+  }else{
+    document.getElementById("salesmanModalTitle").textContent = "Add salesman";
+    document.getElementById("smId").value = "";
+    document.getElementById("smActive").checked = true;
+  }
+  document.getElementById("salesmanModalOverlay").classList.remove("hidden");
+}
+function closeSalesmanModal(){ document.getElementById("salesmanModalOverlay").classList.add("hidden"); }
+function submitSalesmanForm(e){
+  e.preventDefault();
+  const id = document.getElementById("smId").value;
+  const username = document.getElementById("smUsername").value.trim();
+  if(!username){ showToast("Username is required.","error"); return; }
+  const dupe = state.salesmen.find(s=> s.id!==id && (s.username||"").toLowerCase()===username.toLowerCase());
+  if(dupe){ showToast("That username is already taken.","error"); return; }
+  const payload = {
+    name: document.getElementById("smName").value.trim(),
+    username,
+    password: document.getElementById("smPassword").value,
+    active: document.getElementById("smActive").checked
+  };
+  if(id){ updateRecord("salesmen", id, payload); showToast("Salesman updated.","success"); }
+  else{ addRecord("salesmen", payload); showToast("Salesman added.","success"); }
+  closeSalesmanModal();
+  renderSalesmenPage();
+}
+
+/* ============================================================
+   SECTION 9: SETTINGS (ADMIN)
+============================================================ */
+function loadSettingsForm(){
+  document.getElementById("setStoreName").value = state.settings.storeName||"";
+  document.getElementById("setAdminUsername").value = state.settings.adminUsername||"";
+  document.getElementById("setAdminPassword").value = state.settings.adminPassword||"";
+}
+function submitSettingsForm(e){
+  e.preventDefault();
+  state.settings.storeName = document.getElementById("setStoreName").value.trim() || "Valtrix Store";
+  state.settings.adminUsername = document.getElementById("setAdminUsername").value.trim() || "admin";
+  state.settings.adminPassword = document.getElementById("setAdminPassword").value || "admin123";
+  saveState();
+  applyStoreNameToUi();
+  showToast("Settings saved.","success");
+}
+
+/* ============================================================
+   SECTION 10: SALESMAN SEARCH PAGE
+============================================================ */
+function renderSalesSearchPage(){
+  const q = els.salesProductSearch.value;
+  const list = filterProducts(state.products, q).slice().sort((a,b)=> (a.name||"").localeCompare(b.name||""));
+  els.salesProductCount.textContent = `${state.products.length} product${state.products.length===1?"":"s"} available`;
+  if(!list.length){
+    els.salesProductGrid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">🔍</div><p>No products found.</p></div>`;
+    return;
+  }
+  els.salesProductGrid.innerHTML = list.map(p=>productCardHtml(p,false)).join("");
+}
+
+/* ============================================================
+   SECTION 11: PUBLIC PRODUCT DETAIL VIEW
+============================================================ */
+function getUrlProductId(){
+  const params = new URLSearchParams(window.location.search);
+  return params.get("id") || params.get("product");
+}
+function detailSpecHtml(k,v){
+  if(v==null || v==="") return "";
+  return `<div class="spec-box"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`;
+}
+function renderProductDetailFromUrl(){
+  const id = getUrlProductId();
+  const body = document.getElementById("productDetailBody");
+  document.getElementById("pdStoreName").textContent = state.settings.storeName || "Store";
+  if(!id){
+    body.innerHTML = `<div class="notfound"><div style="font-size:2rem;">🏷️</div><p>No product specified.</p></div>`;
+    return;
+  }
+  const p = findProductBySku(id);
+  if(!p){
+    body.innerHTML = `<div class="notfound"><div style="font-size:2rem;">❓</div><p>Product "${escapeHtml(id)}" was not found.</p></div>`;
+    return;
+  }
+  const parts = (p.parts||"").split(",").map(s=>s.trim()).filter(Boolean);
+  body.innerHTML = `
+    <div class="detail-hero">${p.image?`<img src="${p.image}">`:"📦"}</div>
+    <div class="sku-pill">${escapeHtml(p.sku)}</div>
+    <div class="detail-title">${escapeHtml(p.name)}</div>
+    <div class="detail-brandmodel">${escapeHtml([p.brand,p.model].filter(Boolean).join(" · "))}</div>
+    <div class="detail-price-row">
+      <span class="detail-price">$${formatMoney(p.price)}</span>
+      ${p.maxDiscount ? `<span class="detail-discount">Up to ${escapeHtml(p.maxDiscount)}% discount</span>`:""}
+    </div>
+    <div class="spec-grid">
+      ${detailSpecHtml("Dimensions", p.dimensions)}
+      ${detailSpecHtml("Unit", p.unit)}
+      ${detailSpecHtml("Category", p.category)}
+      ${detailSpecHtml("SKU", p.sku)}
+    </div>
+    ${parts.length ? `<div class="detail-section"><h4>Parts / included components</h4><div class="parts-list">${parts.map(pt=>`<span>${escapeHtml(pt)}</span>`).join("")}</div></div>` : ""}
+    ${p.description ? `<div class="detail-section"><h4>Description</h4><p>${escapeHtml(p.description)}</p></div>` : ""}
+    ${p.notes ? `<div class="detail-section"><h4>Notes</h4><p>${escapeHtml(p.notes)}</p></div>` : ""}
+  `;
+}
+
+/* ============================================================
+   SECTION 12: SCANNER
+============================================================ */
+function openScanner(){
+  document.getElementById("scannerModalOverlay").classList.remove("hidden");
+  if(typeof Html5Qrcode === "undefined"){ showToast("Scanner library failed to load.","error"); return; }
+  scannerInstance = new Html5Qrcode("scannerRegion");
+  scannerInstance.start(
+    { facingMode:"environment" },
+    { fps:10, qrbox:{width:220,height:220} },
+    (decodedText)=>{ handleScanResult(decodedText); },
+    ()=>{}
+  ).catch(err=>{
+    showToast("Could not access camera. Check permissions.","error");
+    console.warn("PQIS scanner error", err);
+  });
+}
+function closeScanner(){
+  document.getElementById("scannerModalOverlay").classList.add("hidden");
+  if(scannerInstance){
+    scannerInstance.stop().then(()=>scannerInstance.clear()).catch(()=>{});
+    scannerInstance = null;
+  }
+}
+function handleScanResult(decodedText){
+  let sku = decodedText;
+  try{
+    const u = new URL(decodedText);
+    sku = u.searchParams.get("id") || u.searchParams.get("product") || decodedText;
+  }catch(e){ /* not a URL, treat raw text as SKU */ }
+  closeScanner();
+  const p = findProductBySku(sku);
+  if(!p){ showToast(`No product found for "${sku}".`,"error"); return; }
+  showScannedProductModal(p);
+}
+function showScannedProductModal(p){
+  // Reuse product detail overlay in a lightweight inline modal for logged-in salesmen.
+  const url = productUrl(p.sku);
+  window.open(url, "_blank");
+}
+
+/* ============================================================
+   SECTION 13: GLOBAL CLICK DELEGATION
+============================================================ */
+function handleGlobalClick(e){
+  const pc = e.target.closest(".product-card");
+  const actBtn = e.target.closest("[data-act]");
+  if(pc && actBtn){
+    const id = pc.dataset.id;
+    const product = getById("products", id);
+    const act = actBtn.dataset.act;
+    if(act==="edit") openProductModal(product);
+    else if(act==="qr") openQrModal(product);
+    else if(act==="view") window.open(productUrl(product.sku), "_blank");
+    else if(act==="delete"){
+      confirmAction(`Delete "${product.name}"? This cannot be undone.`, ()=>{
+        deleteRecord("products", id); renderCurrentPage(); showToast("Product deleted.","success");
+      });
+    }
+    return;
+  }
+  const smCard = e.target.closest("#salesmenList .card");
+  if(smCard && actBtn){
+    const id = smCard.dataset.id;
+    const sm = getById("salesmen", id);
+    const act = actBtn.dataset.act;
+    if(act==="edit") openSalesmanModal(sm);
+    else if(act==="delete"){
+      confirmAction(`Delete salesman "${sm.name}"?`, ()=>{
+        deleteRecord("salesmen", id); renderSalesmenPage(); showToast("Salesman deleted.","success");
+      });
+    }
+    return;
+  }
+}
+
+/* ============================================================
+   SECTION 14: INIT / ELEMENT CACHE / EVENTS
+============================================================ */
+function cacheElements(){
+  els = {
+    loadingOverlay: document.getElementById("loadingOverlay"),
+    loginView: document.getElementById("loginView"),
+    appShell: document.getElementById("appShell"),
+    productDetailView: document.getElementById("productDetailView"),
+    tabnavDesktop: document.getElementById("tabnavDesktop"),
+    bottomnavInner: document.getElementById("bottomnavInner"),
+    syncDot: document.getElementById("syncDot"),
+    syncLabel: document.getElementById("syncLabel"),
+    productGrid: document.getElementById("productGrid"),
+    productCount: document.getElementById("productCount"),
+    productSearch: document.getElementById("productSearch"),
+    salesmenList: document.getElementById("salesmenList"),
+    salesProductGrid: document.getElementById("salesProductGrid"),
+    salesProductCount: document.getElementById("salesProductCount"),
+    salesProductSearch: document.getElementById("salesProductSearch")
+  };
+}
+function applyInitialDarkMode(){
+  try{ if(localStorage.getItem("pqis.darkMode")==="1") document.documentElement.classList.add("dark"); }catch(e){}
+}
+function toggleDarkMode(){
+  document.documentElement.classList.toggle("dark");
+  try{ localStorage.setItem("pqis.darkMode", document.documentElement.classList.contains("dark")?"1":"0"); }catch(e){}
+}
+function applyStoreNameToUi(){
+  const name = state.settings.storeName || "Valtrix Store";
+  const appName = document.getElementById("appStoreName"); if(appName) appName.textContent = name;
+  const loginName = document.getElementById("loginStoreName"); if(loginName) loginName.textContent = name;
+}
+function bindEvents(){
+  document.addEventListener("click", handleGlobalClick);
+
+  // role toggle
+  document.getElementById("roleAdminBtn").addEventListener("click", ()=> setLoginRole("admin"));
+  document.getElementById("roleSalesBtn").addEventListener("click", ()=> setLoginRole("salesman"));
+  document.getElementById("loginForm").addEventListener("submit", handleLoginSubmit);
+  document.getElementById("logoutBtn").addEventListener("click", ()=>{
+    session = null; clearSession(); showLogin();
+  });
+  document.getElementById("darkModeToggle").addEventListener("click", toggleDarkMode);
+
+  // product modal
+  document.getElementById("addProductBtn").addEventListener("click", ()=>openProductModal(null));
+  document.getElementById("productModalClose").addEventListener("click", closeProductModal);
+  document.getElementById("productModalCancel").addEventListener("click", closeProductModal);
+  document.getElementById("productForm").addEventListener("submit", submitProductForm);
+  document.getElementById("pfImgDrop").addEventListener("click", ()=> document.getElementById("pfImgInput").click());
+  document.getElementById("pfImgInput").addEventListener("change", (e)=> handleImageFile(e.target.files[0]));
+  document.getElementById("productSearch").addEventListener("input", renderProductsPage);
+
+  // qr modal
+  document.getElementById("qrModalClose").addEventListener("click", closeQrModal);
+
+  // salesman modal
+  document.getElementById("addSalesmanBtn").addEventListener("click", ()=>openSalesmanModal(null));
+  document.getElementById("salesmanModalClose").addEventListener("click", closeSalesmanModal);
+  document.getElementById("salesmanModalCancel").addEventListener("click", closeSalesmanModal);
+  document.getElementById("salesmanForm").addEventListener("submit", submitSalesmanForm);
+
+  // settings
+  document.getElementById("settingsForm").addEventListener("submit", submitSettingsForm);
+
+  // sales search
+  document.getElementById("salesProductSearch").addEventListener("input", renderSalesSearchPage);
+  document.getElementById("scanBtn").addEventListener("click", openScanner);
+  document.getElementById("scannerModalClose").addEventListener("click", closeScanner);
+
+  // confirm modal
+  document.getElementById("confirmCancelBtn").addEventListener("click", closeConfirmModal);
+  document.getElementById("confirmOkBtn").addEventListener("click", ()=>{ const cb=confirmCallback; closeConfirmModal(); if(cb) cb(); });
+
+  document.getElementById("pdAppLink").addEventListener("click", ()=>{
+    const url = new URL(window.location.href); url.search = "";
+    window.location.href = url.toString();
+  });
+
+  // click-outside-to-close for modal overlays
+  document.querySelectorAll(".modal-overlay").forEach(ov=>{
+    ov.addEventListener("click", (e)=>{
+      if(e.target===ov){
+        if(ov.id==="scannerModalOverlay") closeScanner();
+        else ov.classList.add("hidden");
+      }
+    });
+  });
+}
+let pendingRole = "admin";
+function setLoginRole(role){
+  pendingRole = role;
+  document.getElementById("roleAdminBtn").classList.toggle("active", role==="admin");
+  document.getElementById("roleSalesBtn").classList.toggle("active", role==="salesman");
+  document.getElementById("loginHint").style.display = role==="admin" ? "block":"none";
+}
+function handleLoginSubmit(e){
+  e.preventDefault();
+  const username = document.getElementById("loginUsername").value;
+  const password = document.getElementById("loginPassword").value;
+  const result = attemptLogin(pendingRole, username, password);
+  const errEl = document.getElementById("loginErr");
+  if(!result){
+    errEl.textContent = "Incorrect username or password.";
+    errEl.style.display = "block";
+    return;
+  }
+  errEl.style.display = "none";
+  session = result;
+  saveSession(session);
+  showApp();
+}
+function showLogin(){
+  els.appShell.classList.add("hidden");
+  els.productDetailView.classList.add("hidden");
+  els.loginView.classList.remove("hidden");
+  applyStoreNameToUi();
+  setLoginRole("admin");
+  document.getElementById("loginForm").reset();
+}
+function showApp(){
+  els.loginView.classList.add("hidden");
+  els.productDetailView.classList.add("hidden");
+  els.appShell.classList.remove("hidden");
+  applyStoreNameToUi();
+  document.getElementById("appRoleLabel").textContent = session.role==="admin" ? "Admin" : `Salesman · ${session.name||session.username}`;
+  renderNav();
+  goToPage(session.role==="admin" ? "products" : "search");
+  updateSyncIndicator();
+}
+function showProductDetail(){
+  els.loginView.classList.add("hidden");
+  els.appShell.classList.add("hidden");
+  els.productDetailView.classList.remove("hidden");
+  renderProductDetailFromUrl();
+}
+async function init(){
+  cacheElements();
+  applyInitialDarkMode();
+  try{ state = await loadState(); }
+  catch(err){ console.warn("PQIS: unexpected error loading state, starting with local cache.", err); state = loadLocalCache(); }
+  bindEvents();
+
+  if(getUrlProductId()){
+    showProductDetail();
+  }else{
+    session = loadSession();
+    if(session) showApp(); else showLogin();
+  }
+
+  try{ subscribeToCloudUpdates(); }catch(err){ console.warn("PQIS: could not start live sync.", err); }
+  setTimeout(()=>{ els.loadingOverlay.classList.add("hide"); }, 350);
+}
+document.addEventListener("DOMContentLoaded", ()=>{
+  init().catch(err=>{
+    console.warn("PQIS: fatal init error, forcing UI visible.", err);
+    const overlay = document.getElementById("loadingOverlay");
+    if(overlay) overlay.classList.add("hide");
+  });
+});
+})();
+</script>
+</body>
+</html>
